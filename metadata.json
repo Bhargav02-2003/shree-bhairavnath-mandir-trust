@@ -1,0 +1,6 @@
+{
+  "name": "Shree Bhairavnath Mandir Trust",
+  "description": "Full-stack Temple Trust Management System for Shree Bhairavnath Mandir Trust with dashboard, event slider, expense tracking, receipts, and admin controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Production Build
+build/
+dist/
+
+# Coverage
+coverage/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Local SQLite / Uploads
+*.sqlite
+*.db

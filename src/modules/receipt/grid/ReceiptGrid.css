@@ -1,0 +1,4 @@
+/* ReceiptGrid custom styles */
+.receipt-table-row:hover {
+  background-color: rgba(185, 28, 28, 0.02);
+}

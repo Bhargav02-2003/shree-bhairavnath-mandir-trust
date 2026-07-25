@@ -1,0 +1,7 @@
+/* MonthlyEvent custom style */
+.monthly-card {
+  transition: all 0.25s ease;
+}
+.monthly-card:hover {
+  transform: scale(1.01);
+}

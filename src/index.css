@@ -1,0 +1,168 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+}
+
+/* Custom styles for Shree Bhairavnath Mandir Trust */
+body {
+  background-color: #f8fafc;
+  color: #1e293b;
+  font-family: var(--font-sans);
+}
+
+/* Subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Global Dark Mode Overrides */
+html.dark body {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+html.dark .bg-white {
+  background-color: #1e293b !important;
+}
+
+html.dark .text-gray-900 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-gray-800 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-gray-700 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-gray-400 {
+  color: #64748b !important;
+}
+
+html.dark .border-gray-50,
+html.dark .border-gray-100,
+html.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+html.dark nav.bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+
+html.dark .bg-gray-100 {
+  background-color: #334155 !important;
+}
+
+html.dark .bg-red-50\/10 {
+  background-color: rgba(250, 92, 7, 0.12) !important;
+}
+
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-50\/50:hover {
+  background-color: #334155 !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  border-color: #f59e0b !important; /* amber highlight */
+}
+
+html.dark .text-gray-400.font-medium,
+html.dark .text-gray-500.text-xs {
+  color: #cbd5e1 !important;
+}
+
+/* =============================================
+   BRAND THEME: #fa5c07 Saffron Orange
+   Overrides all Tailwind red-* brand classes
+   ============================================= */
+:root {
+  --brand:        #fa5c07;
+  --brand-hover:  #e05206;
+  --brand-dark:   #c44405;
+  --brand-darker: #963305;
+  --brand-light:  #fff4ee;
+  --brand-muted:  rgba(250, 92, 7, 0.08);
+}
+
+/* Backgrounds */
+.bg-red-600  { background-color: var(--brand) !important; }
+.bg-red-700  { background-color: var(--brand) !important; }
+.bg-red-800  { background-color: var(--brand-hover) !important; }
+.bg-red-900  { background-color: var(--brand-dark) !important; }
+.bg-red-950  { background-color: var(--brand-darker) !important; }
+
+/* Hover backgrounds */
+.hover\:bg-red-700:hover { background-color: var(--brand) !important; }
+.hover\:bg-red-800:hover { background-color: var(--brand-hover) !important; }
+.hover\:bg-red-900:hover { background-color: var(--brand-dark) !important; }
+
+/* Text colors */
+.text-red-600 { color: var(--brand) !important; }
+.text-red-700 { color: var(--brand) !important; }
+.text-red-800 { color: var(--brand-hover) !important; }
+.text-red-900 { color: var(--brand-dark) !important; }
+
+/* Hover text */
+.hover\:text-red-700:hover { color: var(--brand) !important; }
+.hover\:text-red-800:hover { color: var(--brand-hover) !important; }
+
+/* Borders */
+.border-red-500  { border-color: var(--brand) !important; }
+.border-red-600  { border-color: var(--brand) !important; }
+.border-red-700  { border-color: var(--brand) !important; }
+.border-red-800  { border-color: var(--brand-hover) !important; }
+.border-red-900  { border-color: var(--brand-dark) !important; }
+
+/* Focus rings */
+.focus\:ring-red-600:focus { --tw-ring-color: var(--brand) !important; }
+.focus\:ring-red-500:focus  { --tw-ring-color: var(--brand) !important; }
+
+/* Light tints */
+.bg-red-50      { background-color: var(--brand-light) !important; }
+.text-red-50    { color: var(--brand-light) !important; }
+.border-red-50  { border-color: var(--brand-light) !important; }
+.border-red-100 { border-color: #fde3ce !important; }
+.bg-red-100     { background-color: #fde3ce !important; }
+.text-red-100   { color: #fde3ce !important; }
+
+/* Disabled state */
+.disabled\:bg-red-400:disabled { background-color: #fca06b !important; }

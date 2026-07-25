@@ -1,0 +1,11 @@
+/* Dashboard.css - Custom styling for Bento Grid Dashboard */
+.bento-card {
+  transition: all 0.2s ease-in-out;
+}
+.bento-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.dashboard-title {
+  font-family: var(--font-display);
+}

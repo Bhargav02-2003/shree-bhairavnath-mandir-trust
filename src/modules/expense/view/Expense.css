@@ -1,0 +1,7 @@
+/* Expense Styles */
+.expense-tag {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
