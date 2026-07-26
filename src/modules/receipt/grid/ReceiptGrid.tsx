@@ -49,7 +49,7 @@ export const ReceiptGrid: React.FC<ReceiptGridProps> = ({
                     {new Date(rec.createdDate).toLocaleDateString("en-IN")}
                   </td>
                   <td className="px-5 py-3.5 font-medium text-gray-900 truncate max-w-[160px]">
-                    {rec.name}
+                    {t(rec.name)}
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -92,7 +92,7 @@ export const ReceiptGrid: React.FC<ReceiptGridProps> = ({
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-gray-500 font-mono text-xs">
-                    {rec.createdBy}
+                    {t(rec.createdBy)}
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-center gap-2">

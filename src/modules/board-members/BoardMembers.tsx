@@ -195,9 +195,9 @@ export const BoardMembers: React.FC = () => {
               </div>
 
               {/* Info */}
-              <h4 className="font-bold text-gray-900 text-sm leading-tight">{member.name}</h4>
+              <h4 className="font-bold text-gray-900 text-sm leading-tight">{t(member.name)}</h4>
               {member.designation && (
-                <p className="text-[11px] text-red-600 font-semibold mt-0.5">{member.designation}</p>
+                <p className="text-[11px] text-red-600 font-semibold mt-0.5">{t(member.designation)}</p>
               )}
 
               {/* Actions (admin only) */}

@@ -8,7 +8,8 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js database.sqlite uploads/*",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "migrate:mongo": "tsx server/migrateToMongo.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -20,6 +21,8 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
+    "mongodb": "^7.5.0",
+    "mongoose": "^9.8.0",
     "motion": "^12.23.24",
     "multer": "^2.2.0",
     "mysql2": "^3.23.0",

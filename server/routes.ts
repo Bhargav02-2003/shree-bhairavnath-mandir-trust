@@ -5,22 +5,25 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { Op } from "sequelize";
 import {
-  User,
-  Receipt,
-  Expense,
-  YearlyEvent,
-  MonthlyEvent,
-  Banner,
-  SliderImage,
-  ActivityLog,
-  Trustee,
-  TrusteePermission,
-  BoardMember,
-} from "./db";
+  MongoUser,
+  MongoReceipt,
+  MongoExpense,
+  MongoYearlyEvent,
+  MongoMonthlyEvent,
+  MongoBanner,
+  MongoSliderImage,
+  MongoActivityLog,
+  MongoTrustee,
+  MongoTrusteePermission,
+  MongoBoardMember,
+} from "./mongoModels";
+import { responseTranslationMiddleware, translateTextsToMarathi } from "./translationMiddleware";
 
 export const apiRouter = Router();
+
+// Mount automatic Marathi response translation middleware
+apiRouter.use(responseTranslationMiddleware);
 
 // Middleware to automatically log every API call to the audit/activity logs
 apiRouter.use((req: any, res: Response, next: () => void) => {
@@ -35,7 +38,8 @@ apiRouter.use((req: any, res: Response, next: () => void) => {
       const action = `${req.method} ${req.originalUrl || req.url}`;
       const details = `API Request processed with HTTP status code ${res.statusCode}`;
 
-      await ActivityLog.create({
+      await MongoActivityLog.create({
+        uuid: crypto.randomUUID(),
         apiUuid,
         authorUuid,
         action,
@@ -166,12 +170,14 @@ export function authorize(permission?: string, requireSuperAdmin = false) {
 // Log Activity utility
 async function logActivity(action: string, details: string, user: string, authorUuid?: string | null) {
   try {
-    await ActivityLog.create({
+    await MongoActivityLog.create({
+      uuid: crypto.randomUUID(),
       action,
       details,
       user,
       status: "active",
       authorUuid: authorUuid || null,
+      timestamp: new Date(),
     });
   } catch {
     // Ignore logging failure
@@ -187,21 +193,59 @@ apiRouter.post("/upload", upload.single("file"), (req: any, res: Response) => {
   res.json({ url: fileUrl, filename: req.file.filename });
 });
 
+// --- Translation Route ---
+apiRouter.post("/translate", async (req: Request, res: Response) => {
+  const { texts } = req.body;
+  if (!Array.isArray(texts)) {
+    return res.status(400).json({ message: "Request body must contain 'texts' array" });
+  }
+  try {
+    const translations = await translateTextsToMarathi(texts);
+    res.json({ translations });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+const PAYLOAD_SECRET_KEY = "shree_bhairavnath_secret_key_32b";
+
+function decryptPayloadPassword(rawPassword: string): string {
+  if (!rawPassword || typeof rawPassword !== "string" || !rawPassword.startsWith("ENC:")) {
+    return rawPassword;
+  }
+  try {
+    const parts = rawPassword.split(":");
+    if (parts.length !== 3) return rawPassword;
+
+    const iv = Buffer.from(parts[1], "hex");
+    const ciphertext = Buffer.from(parts[2], "hex");
+    const key = Buffer.from(PAYLOAD_SECRET_KEY, "utf-8");
+
+    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+    let decrypted = decipher.update(ciphertext);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+    return decrypted.toString("utf-8");
+  } catch (err) {
+    console.error("Failed to decrypt payload password:", err);
+    return rawPassword;
+  }
+}
+
 // --- Auth Endpoints ---
 apiRouter.post("/login", async (req: Request, res: Response) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
+  const { username, password: rawPassword } = req.body;
+  if (!username || !rawPassword) {
     return res.status(400).json({ message: "Username and password are required" });
   }
 
+  const password = decryptPayloadPassword(rawPassword);
+
   try {
-    const user = await User.findOne({ where: { username, status: "active" } });
+    const user = await MongoUser.findOne({ username, status: "active" });
     if (!user) {
       // Check if there is a trustee with this username
-      const trustee = await Trustee.findOne({
-        where: { username, status: "active" },
-        include: [{ model: TrusteePermission, as: "permissions" }]
-      });
+      const trustee = await MongoTrustee.findOne({ username, status: "active" });
 
       if (trustee) {
         const isMatch = await bcrypt.compare(password, trustee.passwordHash);
@@ -209,10 +253,11 @@ apiRouter.post("/login", async (req: Request, res: Response) => {
           return res.status(401).json({ message: "Invalid password" });
         }
 
+        const rawPerms = await MongoTrusteePermission.find({ trusteeUuid: trustee.uuid, status: "active" });
+
         // Process permissions into a handy object
         const trusteePerms: any = {};
-        const rawPerms = (trustee as any).permissions || [];
-        ["receipts", "expenses", "yearly_events", "monthly_events", "banners"].forEach(m => {
+        ["receipts", "expenses", "yearly_events", "monthly_events", "banners"].forEach((m) => {
           trusteePerms[m] = { read: false, write: false, update: false };
         });
         rawPerms.forEach((p: any) => {
@@ -305,10 +350,7 @@ apiRouter.post("/logout", authenticate, async (req: any, res: Response) => {
 // --- Users (Super Admin Only) ---
 apiRouter.get("/users", authenticate, authorize("", true), async (req: Request, res: Response) => {
   try {
-    const users = await User.findAll({
-      where: { status: "active" },
-      attributes: { exclude: ["password"] }
-    });
+    const users = await MongoUser.find({ status: "active" }, "-password");
     res.json(users);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -322,7 +364,7 @@ apiRouter.post("/users", authenticate, authorize("", true), async (req: any, res
   }
 
   try {
-    const existing = await User.findOne({ where: { username } });
+    const existing = await MongoUser.findOne({ username });
     if (existing) {
       return res.status(400).json({ message: "Username already exists" });
     }
@@ -330,7 +372,8 @@ apiRouter.post("/users", authenticate, authorize("", true), async (req: any, res
     const hashedPassword = await bcrypt.hash(password, 10);
     const defaultPerms = role === "super_admin" ? "read,write,update,delete" : (permissions || "read,write,update");
 
-    const newUser = await User.create({
+    const newUser = await MongoUser.create({
+      uuid: crypto.randomUUID(),
       name,
       username,
       password: hashedPassword,
@@ -343,8 +386,8 @@ apiRouter.post("/users", authenticate, authorize("", true), async (req: any, res
 
     await logActivity("USER_CREATED", `Created user ${name} (${username})`, req.user.username);
 
-    const responseUser = newUser.toJSON() as any;
-    delete responseUser.password;
+    const responseUser = newUser.toJSON();
+    delete (responseUser as any).password;
     res.status(201).json(responseUser);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -354,7 +397,7 @@ apiRouter.post("/users", authenticate, authorize("", true), async (req: any, res
 apiRouter.put("/users/:id", authenticate, authorize("", true), async (req: any, res: Response) => {
   const { name, email, role, status, permissions, password } = req.body;
   try {
-    const user = await User.findByPk(req.params.id);
+    const user = await MongoUser.findOne({ uuid: req.params.id });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -372,8 +415,8 @@ apiRouter.put("/users/:id", authenticate, authorize("", true), async (req: any, 
     await user.save();
     await logActivity("USER_UPDATED", `Updated user ${user.name} (${user.username})`, req.user.username);
 
-    const responseUser = user.toJSON() as any;
-    delete responseUser.password;
+    const responseUser = user.toJSON();
+    delete (responseUser as any).password;
     res.json(responseUser);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -382,7 +425,7 @@ apiRouter.put("/users/:id", authenticate, authorize("", true), async (req: any, 
 
 apiRouter.delete("/users/:id", authenticate, authorize("", true), async (req: any, res: Response) => {
   try {
-    const user = await User.findByPk(req.params.id);
+    const user = await MongoUser.findOne({ uuid: req.params.id });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -405,15 +448,16 @@ apiRouter.get("/receipts", async (req: Request, res: Response) => {
   const { search, reason, dateFrom, dateTo, page = "1", limit = "10" } = req.query;
   const pageNum = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
-  const offset = (pageNum - 1) * limitNum;
+  const skip = (pageNum - 1) * limitNum;
 
   const whereClause: any = { status: "active" };
 
   if (search) {
-    whereClause[Op.or] = [
-      { name: { [Op.like]: `%${search}%` } },
-      { receiptNo: { [Op.like]: `%${search}%` } },
-      { foodName: { [Op.like]: `%${search}%` } },
+    const searchRegex = new RegExp(search as string, "i");
+    whereClause.$or = [
+      { name: searchRegex },
+      { receiptNo: searchRegex },
+      { foodName: searchRegex },
     ];
   }
 
@@ -422,20 +466,19 @@ apiRouter.get("/receipts", async (req: Request, res: Response) => {
   }
 
   if (dateFrom && dateTo) {
-    whereClause.createdDate = { [Op.between]: [dateFrom, dateTo] };
+    whereClause.createdDate = { $gte: dateFrom, $lte: dateTo };
   } else if (dateFrom) {
-    whereClause.createdDate = { [Op.gte]: dateFrom };
+    whereClause.createdDate = { $gte: dateFrom };
   } else if (dateTo) {
-    whereClause.createdDate = { [Op.lte]: dateTo };
+    whereClause.createdDate = { $lte: dateTo };
   }
 
   try {
-    const { count, rows } = await Receipt.findAndCountAll({
-      where: whereClause,
-      order: [["createdDate", "DESC"], ["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-    });
+    const count = await MongoReceipt.countDocuments(whereClause);
+    const rows = await MongoReceipt.find(whereClause)
+      .sort({ createdDate: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     res.json({
       data: rows,
@@ -450,7 +493,7 @@ apiRouter.get("/receipts", async (req: Request, res: Response) => {
 
 apiRouter.get("/receipts/:id", async (req: Request, res: Response) => {
   try {
-    const receipt = await Receipt.findByPk(req.params.id);
+    const receipt = await MongoReceipt.findOne({ uuid: req.params.id });
     if (!receipt || receipt.status === "inactive") {
       return res.status(404).json({ message: "Receipt not found" });
     }
@@ -468,10 +511,11 @@ apiRouter.post("/receipts", authenticate, authorize("write"), async (req: any, r
 
   try {
     // Generate simple receipt number based on total active receipts
-    const totalReceipts = await Receipt.count({ where: { status: "active" } });
+    const totalReceipts = await MongoReceipt.countDocuments({ status: "active" });
     const receiptNo = `REC-${1000 + totalReceipts + 1}`;
 
-    const receipt = await Receipt.create({
+    const receipt = await MongoReceipt.create({
+      uuid: crypto.randomUUID(),
       receiptNo,
       name,
       reason,
@@ -498,7 +542,7 @@ apiRouter.post("/receipts", authenticate, authorize("write"), async (req: any, r
 apiRouter.put("/receipts/:id", authenticate, authorize("update"), async (req: any, res: Response) => {
   const { name, reason, amount, foodName, foodQty, image, createdDate, mobile, address, paymentMode } = req.body;
   try {
-    const receipt = await Receipt.findByPk(req.params.id);
+    const receipt = await MongoReceipt.findOne({ uuid: req.params.id });
     if (!receipt || receipt.status === "inactive") {
       return res.status(404).json({ message: "Receipt not found" });
     }
@@ -508,7 +552,8 @@ apiRouter.put("/receipts/:id", authenticate, authorize("update"), async (req: an
     await receipt.save();
 
     // Create a new entry in database for the updated receipt (append-only)
-    const newReceipt = await Receipt.create({
+    const newReceipt = await MongoReceipt.create({
+      uuid: crypto.randomUUID(),
       receiptNo: receipt.receiptNo, // Keep the same receipt number
       name: name !== undefined ? name : receipt.name,
       reason: reason !== undefined ? reason : receipt.reason,
@@ -534,7 +579,7 @@ apiRouter.put("/receipts/:id", authenticate, authorize("update"), async (req: an
 
 apiRouter.delete("/receipts/:id", authenticate, authorize("delete"), async (req: any, res: Response) => {
   try {
-    const receipt = await Receipt.findByPk(req.params.id);
+    const receipt = await MongoReceipt.findOne({ uuid: req.params.id });
     if (!receipt) {
       return res.status(404).json({ message: "Receipt not found" });
     }
@@ -551,10 +596,7 @@ apiRouter.delete("/receipts/:id", authenticate, authorize("delete"), async (req:
 // --- Yearly Events ---
 apiRouter.get("/yearly_events", async (req: Request, res: Response) => {
   try {
-    const events = await YearlyEvent.findAll({
-      where: { status: "active" },
-      order: [["date", "ASC"]]
-    });
+    const events = await MongoYearlyEvent.find({ status: "active" }).sort({ date: 1 });
     res.json(events);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -567,7 +609,8 @@ apiRouter.post("/yearly_events", authenticate, authorize("write"), async (req: a
     return res.status(400).json({ message: "All fields are required" });
   }
   try {
-    const event = await YearlyEvent.create({
+    const event = await MongoYearlyEvent.create({
+      uuid: crypto.randomUUID(),
       title,
       description,
       date,
@@ -587,7 +630,7 @@ apiRouter.post("/yearly_events", authenticate, authorize("write"), async (req: a
 apiRouter.put("/yearly_events/:id", authenticate, authorize("update"), async (req: any, res: Response) => {
   const { title, description, date, image, location, status } = req.body;
   try {
-    const event = await YearlyEvent.findByPk(req.params.id);
+    const event = await MongoYearlyEvent.findOne({ uuid: req.params.id });
     if (!event || event.status === "inactive") return res.status(404).json({ message: "Event not found" });
 
     if (title) event.title = title;
@@ -608,7 +651,7 @@ apiRouter.put("/yearly_events/:id", authenticate, authorize("update"), async (re
 
 apiRouter.delete("/yearly_events/:id", authenticate, authorize("delete"), async (req: any, res: Response) => {
   try {
-    const event = await YearlyEvent.findByPk(req.params.id);
+    const event = await MongoYearlyEvent.findOne({ uuid: req.params.id });
     if (!event) return res.status(404).json({ message: "Event not found" });
 
     event.status = "inactive";
@@ -623,10 +666,7 @@ apiRouter.delete("/yearly_events/:id", authenticate, authorize("delete"), async 
 // --- Monthly Events ---
 apiRouter.get("/monthly_events", async (req: Request, res: Response) => {
   try {
-    const events = await MonthlyEvent.findAll({
-      where: { status: "active" },
-      order: [["date", "ASC"]]
-    });
+    const events = await MongoMonthlyEvent.find({ status: "active" }).sort({ date: 1 });
     res.json(events);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -639,7 +679,8 @@ apiRouter.post("/monthly_events", authenticate, authorize("write"), async (req: 
     return res.status(400).json({ message: "All fields are required" });
   }
   try {
-    const event = await MonthlyEvent.create({
+    const event = await MongoMonthlyEvent.create({
+      uuid: crypto.randomUUID(),
       title,
       description,
       date,
@@ -659,7 +700,7 @@ apiRouter.post("/monthly_events", authenticate, authorize("write"), async (req: 
 apiRouter.put("/monthly_events/:id", authenticate, authorize("update"), async (req: any, res: Response) => {
   const { title, description, date, image, location, status } = req.body;
   try {
-    const event = await MonthlyEvent.findByPk(req.params.id);
+    const event = await MongoMonthlyEvent.findOne({ uuid: req.params.id });
     if (!event || event.status === "inactive") return res.status(404).json({ message: "Event not found" });
 
     if (title) event.title = title;
@@ -680,7 +721,7 @@ apiRouter.put("/monthly_events/:id", authenticate, authorize("update"), async (r
 
 apiRouter.delete("/monthly_events/:id", authenticate, authorize("delete"), async (req: any, res: Response) => {
   try {
-    const event = await MonthlyEvent.findByPk(req.params.id);
+    const event = await MongoMonthlyEvent.findOne({ uuid: req.params.id });
     if (!event) return res.status(404).json({ message: "Event not found" });
 
     event.status = "inactive";
@@ -697,14 +738,15 @@ apiRouter.get("/expenses", async (req: Request, res: Response) => {
   const { search, category, page = "1", limit = "10" } = req.query;
   const pageNum = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
-  const offset = (pageNum - 1) * limitNum;
+  const skip = (pageNum - 1) * limitNum;
 
   const whereClause: any = { status: "active" };
 
   if (search) {
-    whereClause[Op.or] = [
-      { name: { [Op.like]: `%${search}%` } },
-      { description: { [Op.like]: `%${search}%` } },
+    const searchRegex = new RegExp(search as string, "i");
+    whereClause.$or = [
+      { name: searchRegex },
+      { description: searchRegex },
     ];
   }
 
@@ -713,12 +755,11 @@ apiRouter.get("/expenses", async (req: Request, res: Response) => {
   }
 
   try {
-    const { count, rows } = await Expense.findAndCountAll({
-      where: whereClause,
-      order: [["date", "DESC"], ["createdAt", "DESC"]],
-      limit: limitNum,
-      offset,
-    });
+    const count = await MongoExpense.countDocuments(whereClause);
+    const rows = await MongoExpense.find(whereClause)
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     res.json({
       data: rows,
@@ -738,7 +779,8 @@ apiRouter.post("/expenses", authenticate, authorize("write"), async (req: any, r
   }
 
   try {
-    const expense = await Expense.create({
+    const expense = await MongoExpense.create({
+      uuid: crypto.randomUUID(),
       name,
       category,
       amount,
@@ -761,7 +803,7 @@ apiRouter.post("/expenses", authenticate, authorize("write"), async (req: any, r
 apiRouter.put("/expenses/:id", authenticate, authorize("update"), async (req: any, res: Response) => {
   const { name, category, amount, description, date, bill, paymentMode } = req.body;
   try {
-    const expense = await Expense.findByPk(req.params.id);
+    const expense = await MongoExpense.findOne({ uuid: req.params.id });
     if (!expense || expense.status === "inactive") return res.status(404).json({ message: "Expense not found" });
 
     // Mark previous revision as inactive
@@ -769,7 +811,8 @@ apiRouter.put("/expenses/:id", authenticate, authorize("update"), async (req: an
     await expense.save();
 
     // Create a new entry in database for the updated expense (append-only)
-    const newExpense = await Expense.create({
+    const newExpense = await MongoExpense.create({
+      uuid: crypto.randomUUID(),
       name: name !== undefined ? name : expense.name,
       category: category !== undefined ? category : expense.category,
       amount: amount !== undefined ? amount : expense.amount,
@@ -791,7 +834,7 @@ apiRouter.put("/expenses/:id", authenticate, authorize("update"), async (req: an
 
 apiRouter.delete("/expenses/:id", authenticate, authorize("delete"), async (req: any, res: Response) => {
   try {
-    const expense = await Expense.findByPk(req.params.id);
+    const expense = await MongoExpense.findOne({ uuid: req.params.id });
     if (!expense) return res.status(404).json({ message: "Expense not found" });
 
     expense.status = "inactive";
@@ -806,15 +849,13 @@ apiRouter.delete("/expenses/:id", authenticate, authorize("delete"), async (req:
 // --- Banners (Super Admin & Trustees) ---
 apiRouter.get("/banners", async (req: Request, res: Response) => {
   try {
-    const banners = await Banner.findAll({
-      where: {
-        status: "active",
-        active: true,
-        [Op.or]: [
-          { expiresAt: null },
-          { expiresAt: { [Op.gt]: new Date() } }
-        ]
-      }
+    const banners = await MongoBanner.find({
+      status: "active",
+      active: true,
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } }
+      ]
     });
     res.json(banners);
   } catch (err: any) {
@@ -824,9 +865,7 @@ apiRouter.get("/banners", async (req: Request, res: Response) => {
 
 apiRouter.get("/banners/all", authenticate, authorize("", false), async (req: Request, res: Response) => {
   try {
-    const banners = await Banner.findAll({
-      order: [["createdAt", "DESC"]]
-    });
+    const banners = await MongoBanner.find().sort({ createdAt: -1 });
     res.json(banners);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -842,7 +881,8 @@ apiRouter.post("/banners", authenticate, authorize("", false), async (req: any, 
     return res.status(400).json({ message: "Either Image or Description is required" });
   }
   try {
-    const banner = await Banner.create({
+    const banner = await MongoBanner.create({
+      uuid: crypto.randomUUID(),
       title,
       image: image || null,
       description: description || null,
@@ -862,7 +902,7 @@ apiRouter.post("/banners", authenticate, authorize("", false), async (req: any, 
 
 apiRouter.delete("/banners/:id", authenticate, authorize("", false), async (req: any, res: Response) => {
   try {
-    const banner = await Banner.findByPk(req.params.id);
+    const banner = await MongoBanner.findOne({ uuid: req.params.id });
     if (!banner) return res.status(404).json({ message: "Banner not found" });
 
     banner.status = "inactive";
@@ -878,7 +918,7 @@ apiRouter.delete("/banners/:id", authenticate, authorize("", false), async (req:
 // --- Slider Images (Super Admin Only) ---
 apiRouter.get("/slider_images", async (req: Request, res: Response) => {
   try {
-    const sliderImages = await SliderImage.findAll({ where: { status: "active" } });
+    const sliderImages = await MongoSliderImage.find({ status: "active" });
     res.json(sliderImages);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -891,7 +931,8 @@ apiRouter.post("/slider_images", authenticate, authorize("", true), async (req: 
     return res.status(400).json({ message: "Image and Title are required" });
   }
   try {
-    const sliderImg = await SliderImage.create({
+    const sliderImg = await MongoSliderImage.create({
+      uuid: crypto.randomUUID(),
       image,
       title,
       active: active !== undefined ? active : true,
@@ -907,7 +948,7 @@ apiRouter.post("/slider_images", authenticate, authorize("", true), async (req: 
 
 apiRouter.delete("/slider_images/:id", authenticate, authorize("", true), async (req: any, res: Response) => {
   try {
-    const sliderImg = await SliderImage.findByPk(req.params.id);
+    const sliderImg = await MongoSliderImage.findOne({ uuid: req.params.id });
     if (!sliderImg) return res.status(404).json({ message: "Slider image not found" });
 
     sliderImg.status = "inactive";
@@ -923,30 +964,28 @@ apiRouter.delete("/slider_images/:id", authenticate, authorize("", true), async 
 apiRouter.get("/dashboard/summary", async (req: Request, res: Response) => {
   try {
     // 1. Sum up Receipts
-    const receipts = await Receipt.findAll({ where: { status: "active" }, attributes: ["amount"] });
+    const receipts = await MongoReceipt.find({ status: "active" }, "amount");
     const totalReceipts = receipts.reduce((sum, r) => sum + (r.amount || 0), 0);
 
     // 2. Sum up Expenses
-    const expenses = await Expense.findAll({ where: { status: "active" }, attributes: ["amount"] });
+    const expenses = await MongoExpense.find({ status: "active" }, "amount");
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
     // 3. Count Upcoming events
-    const yearlyUpcomingCount = await YearlyEvent.count({ where: { status: "active", eventStatus: "upcoming" } });
-    const monthlyUpcomingCount = await MonthlyEvent.count({ where: { status: "active", eventStatus: "upcoming" } });
+    const yearlyUpcomingCount = await MongoYearlyEvent.countDocuments({ status: "active", eventStatus: "upcoming" });
+    const monthlyUpcomingCount = await MongoMonthlyEvent.countDocuments({ status: "active", eventStatus: "upcoming" });
     const upcomingEvents = yearlyUpcomingCount + monthlyUpcomingCount;
 
     // 4. Yearly count
-    const yearlyEvents = await YearlyEvent.count({ where: { status: "active" } });
+    const yearlyEvents = await MongoYearlyEvent.countDocuments({ status: "active" });
 
     // 5. Monthly count
-    const monthlyEvents = await MonthlyEvent.count({ where: { status: "active" } });
+    const monthlyEvents = await MongoMonthlyEvent.countDocuments({ status: "active" });
 
     // 6. Recent logs (last 8)
-    const recentActivities = await ActivityLog.findAll({
-      where: { status: "active" },
-      order: [["timestamp", "DESC"]],
-      limit: 8,
-    });
+    const recentActivities = await MongoActivityLog.find({ status: "active" })
+      .sort({ timestamp: -1 })
+      .limit(8);
 
     res.json({
       totalReceipts,
@@ -971,12 +1010,16 @@ function blockTrustees(req: any, res: Response, next: () => void) {
 
 apiRouter.get("/trustees", authenticate, blockTrustees, async (req: Request, res: Response) => {
   try {
-    const trustees = await Trustee.findAll({
-      where: { status: "active" },
-      include: [{ model: TrusteePermission, as: "permissions" }],
-      order: [["createdAt", "DESC"]],
-    });
-    res.json(trustees);
+    const trustees = await MongoTrustee.find({ status: "active" }).sort({ createdAt: -1 });
+    const trusteeList = await Promise.all(
+      trustees.map(async (t) => {
+        const perms = await MongoTrusteePermission.find({ trusteeUuid: t.uuid, status: "active" });
+        const obj = t.toJSON();
+        (obj as any).permissions = perms;
+        return obj;
+      })
+    );
+    res.json(trusteeList);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -984,13 +1027,14 @@ apiRouter.get("/trustees", authenticate, blockTrustees, async (req: Request, res
 
 apiRouter.get("/trustees/:id", authenticate, blockTrustees, async (req: Request, res: Response) => {
   try {
-    const trustee = await Trustee.findByPk(req.params.id, {
-      include: [{ model: TrusteePermission, as: "permissions" }],
-    });
+    const trustee = await MongoTrustee.findOne({ uuid: req.params.id });
     if (!trustee || trustee.status === "inactive") {
       return res.status(404).json({ message: "Trustee not found" });
     }
-    res.json(trustee);
+    const perms = await MongoTrusteePermission.find({ trusteeUuid: trustee.uuid, status: "active" });
+    const obj = trustee.toJSON();
+    (obj as any).permissions = perms;
+    res.json(obj);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -1003,13 +1047,16 @@ apiRouter.post("/trustees", authenticate, blockTrustees, async (req: any, res: R
   }
 
   try {
-    const existing = await Trustee.findOne({ where: { username } });
+    const existing = await MongoTrustee.findOne({ username });
     if (existing) {
       return res.status(400).json({ message: "Username already exists" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const trustee = await Trustee.create({
+    const trusteeUuid = crypto.randomUUID();
+
+    const trustee = await MongoTrustee.create({
+      uuid: trusteeUuid,
       fullName,
       username,
       passwordHash,
@@ -1024,9 +1071,10 @@ apiRouter.post("/trustees", authenticate, blockTrustees, async (req: any, res: R
     // Create permissions
     const modules = ["receipts", "expenses", "yearly_events", "monthly_events", "banners"];
 
-    const permsToCreate = modules.map(mod => {
+    const permsToCreate = modules.map((mod) => {
       const modulePerm = (permissions || {})[mod] || {};
       return {
+        uuid: crypto.randomUUID(),
         trusteeUuid: trustee.uuid,
         moduleName: mod,
         canRead: !!modulePerm.read,
@@ -1037,13 +1085,12 @@ apiRouter.post("/trustees", authenticate, blockTrustees, async (req: any, res: R
       };
     });
 
-    await TrusteePermission.bulkCreate(permsToCreate);
+    const perms = await MongoTrusteePermission.insertMany(permsToCreate);
     await logActivity("TRUSTEE_CREATED", `Created trustee account for ${fullName} (${username})`, req.user.username);
 
-    const createdTrustee = await Trustee.findByPk(trustee.uuid, {
-      include: [{ model: TrusteePermission, as: "permissions" }],
-    });
-    res.status(201).json(createdTrustee);
+    const createdObj = trustee.toJSON();
+    (createdObj as any).permissions = perms;
+    res.status(201).json(createdObj);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -1052,7 +1099,7 @@ apiRouter.post("/trustees", authenticate, blockTrustees, async (req: any, res: R
 apiRouter.put("/trustees/:id", authenticate, blockTrustees, async (req: any, res: Response) => {
   const { fullName, mobile, email, designation, profilePhoto, status, permissions } = req.body;
   try {
-    const trustee = await Trustee.findByPk(req.params.id);
+    const trustee = await MongoTrustee.findOne({ uuid: req.params.id });
     if (!trustee || trustee.status === "inactive") {
       return res.status(404).json({ message: "Trustee not found" });
     }
@@ -1068,13 +1115,14 @@ apiRouter.put("/trustees/:id", authenticate, blockTrustees, async (req: any, res
     await trustee.save();
 
     if (permissions) {
-      // Update permissions - simplest way is delete and recreate
-      await TrusteePermission.destroy({ where: { trusteeUuid: trustee.uuid } });
+      // Update permissions - remove existing and insert new
+      await MongoTrusteePermission.deleteMany({ trusteeUuid: trustee.uuid });
       const modules = ["receipts", "expenses", "yearly_events", "monthly_events", "banners"];
 
-      const permsToCreate = modules.map(mod => {
+      const permsToCreate = modules.map((mod) => {
         const modulePerm = permissions[mod] || {};
         return {
+          uuid: crypto.randomUUID(),
           trusteeUuid: trustee.uuid,
           moduleName: mod,
           canRead: !!modulePerm.read,
@@ -1084,15 +1132,15 @@ apiRouter.put("/trustees/:id", authenticate, blockTrustees, async (req: any, res
           authorUuid: req.user.uuid || null,
         };
       });
-      await TrusteePermission.bulkCreate(permsToCreate);
+      await MongoTrusteePermission.insertMany(permsToCreate);
     }
 
     await logActivity("TRUSTEE_UPDATED", `Updated trustee account for ${trustee.fullName}`, req.user.username);
 
-    const updatedTrustee = await Trustee.findByPk(trustee.uuid, {
-      include: [{ model: TrusteePermission, as: "permissions" }],
-    });
-    res.json(updatedTrustee);
+    const perms = await MongoTrusteePermission.find({ trusteeUuid: trustee.uuid, status: "active" });
+    const updatedObj = trustee.toJSON();
+    (updatedObj as any).permissions = perms;
+    res.json(updatedObj);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -1105,7 +1153,7 @@ apiRouter.patch("/trustees/:id/status", authenticate, blockTrustees, async (req:
   }
 
   try {
-    const trustee = await Trustee.findByPk(req.params.id);
+    const trustee = await MongoTrustee.findOne({ uuid: req.params.id });
     if (!trustee || trustee.status === "inactive") {
       return res.status(404).json({ message: "Trustee not found" });
     }
@@ -1128,7 +1176,7 @@ apiRouter.patch("/trustees/:id/reset-password", authenticate, blockTrustees, asy
   }
 
   try {
-    const trustee = await Trustee.findByPk(req.params.id);
+    const trustee = await MongoTrustee.findOne({ uuid: req.params.id });
     if (!trustee || trustee.status === "inactive") {
       return res.status(404).json({ message: "Trustee not found" });
     }
@@ -1146,7 +1194,7 @@ apiRouter.patch("/trustees/:id/reset-password", authenticate, blockTrustees, asy
 
 apiRouter.delete("/trustees/:id", authenticate, blockTrustees, async (req: any, res: Response) => {
   try {
-    const trustee = await Trustee.findByPk(req.params.id);
+    const trustee = await MongoTrustee.findOne({ uuid: req.params.id });
     if (!trustee) {
       return res.status(404).json({ message: "Trustee not found" });
     }
@@ -1164,10 +1212,7 @@ apiRouter.delete("/trustees/:id", authenticate, blockTrustees, async (req: any, 
 // --- Board Members (Public Read, Admin Write) ---
 apiRouter.get("/board_members", async (req: Request, res: Response) => {
   try {
-    const members = await BoardMember.findAll({
-      where: { status: "active" },
-      order: [["displayOrder", "ASC"], ["createdAt", "ASC"]],
-    });
+    const members = await MongoBoardMember.find({ status: "active" }).sort({ displayOrder: 1, createdAt: 1 });
     res.json(members);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
@@ -1180,7 +1225,8 @@ apiRouter.post("/board_members", authenticate, authorize("write"), async (req: a
     return res.status(400).json({ message: "Member name is required" });
   }
   try {
-    const member = await BoardMember.create({
+    const member = await MongoBoardMember.create({
+      uuid: crypto.randomUUID(),
       name: name.trim(),
       designation: designation?.trim() || null,
       profilePhoto: profilePhoto || null,
@@ -1198,7 +1244,7 @@ apiRouter.post("/board_members", authenticate, authorize("write"), async (req: a
 apiRouter.put("/board_members/:id", authenticate, authorize("update"), async (req: any, res: Response) => {
   const { name, designation, profilePhoto, displayOrder } = req.body;
   try {
-    const member = await BoardMember.findByPk(req.params.id);
+    const member = await MongoBoardMember.findOne({ uuid: req.params.id });
     if (!member || member.status === "inactive") {
       return res.status(404).json({ message: "Board member not found" });
     }
@@ -1217,7 +1263,7 @@ apiRouter.put("/board_members/:id", authenticate, authorize("update"), async (re
 
 apiRouter.delete("/board_members/:id", authenticate, authorize("delete"), async (req: any, res: Response) => {
   try {
-    const member = await BoardMember.findByPk(req.params.id);
+    const member = await MongoBoardMember.findOne({ uuid: req.params.id });
     if (!member) {
       return res.status(404).json({ message: "Board member not found" });
     }
@@ -1230,4 +1276,3 @@ apiRouter.delete("/board_members/:id", authenticate, authorize("delete"), async 
     res.status(500).json({ message: err.message });
   }
 });
-

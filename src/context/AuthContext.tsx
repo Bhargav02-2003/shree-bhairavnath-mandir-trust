@@ -1,17 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 import { User } from "../types";
+import { encryptPayloadPassword } from "../utils/security";
 
 // Create Axios Instance
 export const api = axios.create({
   baseURL: "/api",
 });
 
-// Request interceptor to automatically attach JWT token
+// Request interceptor to automatically attach JWT token and language header
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("temple_trust_token");
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const lang = localStorage.getItem("temple_trust_lang") || "en";
+  if (config.headers) {
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    config.headers["Accept-Language"] = lang;
   }
   return config;
 });
@@ -41,12 +46,12 @@ const translations: Record<"en" | "mr", Record<string, string>> = {
     "nav.zone": "Trustee Zone",
     "nav.login": "Trustee Login",
     "nav.logout": "Sign Out",
-    "brand.title": "Shree Bhairavnath Mandir Devastan Trust",
+    "brand.title": "Shree Bhairavnath Mandir Trust",
     "brand.subtitle": "Official Trust Management & Accounts Audit System • Reg. No. E-14023",
     "brand.prassana": "॥ श्री भैरवनाथ प्रसन्न ॥",
     "brand.footer1": "॥ शुभं भवतु • कल्याणमस्तु ॥",
-    "brand.footer2": "© 2026 Shree Bhairavnath Mandir Devastan Trust, Pune. All Rights Reserved.",
-    "brand.footer3": "Managed & Certified under Central Devastan Public Trust Act.",
+    "brand.footer2": "© 2026 Shree Bhairavnath Mandir Trust, Pune. All Rights Reserved.",
+    "brand.footer3": "Managed & Certified under Central Public Trust Act.",
     "action.add": "Add New",
     "action.edit": "Edit",
     "action.delete": "Delete",
@@ -85,7 +90,7 @@ const translations: Record<"en" | "mr", Record<string, string>> = {
     "dashboard.loading": "Loading Shree Bhairavnath Mandir Trust Portal...",
     "dashboard.upcoming": "Upcoming Mahotsav",
     "dashboard.sliderDesc": "Join us with family & devotees at Shree Bhairavnath Mandir to seek divine blessings.",
-    "dashboard.announceTitle": "Important Mandir announcement",
+    "dashboard.announceTitle": "Important Mandir ",
     "dashboard.announceDesc": "Daily Maha Abhishek Aarti timings: 5:30 AM (Pratahkaal) & 7:30 PM (Sandhyakaal). Devotees can book Pooja Receipts online or at the Mandir Trust counter.",
     "dashboard.totalReceipts": "Total Receipts",
     "dashboard.securedDonations": "Secured Donations",
@@ -238,12 +243,12 @@ const translations: Record<"en" | "mr", Record<string, string>> = {
     "nav.zone": "विश्वस्त विभाग",
     "nav.login": "विश्वस्त लॉगिन",
     "nav.logout": "बाहेर पडा",
-    "brand.title": "श्री भैरवनाथ मंदिर देवस्थान ट्रस्ट",
+    "brand.title": "श्री भैरवनाथ मंदिर ट्रस्ट",
     "brand.subtitle": "अधिकृत ट्रस्ट व्यवस्थापन आणि खाते लेखापरीक्षण प्रणाली • नोंदणी क्र. E-14023",
     "brand.prassana": "॥ श्री भैरवनाथ प्रसन्न ॥",
     "brand.footer1": "॥ शुभं भवतु • कल्याणमस्तु ॥",
-    "brand.footer2": "© २०२६ श्री भैरवनाथ मंदिर देवस्थान ट्रस्ट, पुणे. सर्व हक्क सुरक्षित.",
-    "brand.footer3": "केंद्रीय देवस्थान सार्वजनिक ट्रस्ट कायद्यांतर्गत व्यवस्थापित आणि प्रमाणित.",
+    "brand.footer2": "© २०२६ श्री भैरवनाथ मंदिर ट्रस्ट, पुणे. सर्व हक्क सुरक्षित.",
+    "brand.footer3": "केंद्रीय सार्वजनिक ट्रस्ट कायद्यांतर्गत व्यवस्थापित आणि प्रमाणित.",
     "action.add": "नवीन जोडा",
     "action.edit": "सुधारणे",
     "action.delete": "रद्द करा",
@@ -282,7 +287,7 @@ const translations: Record<"en" | "mr", Record<string, string>> = {
     "dashboard.loading": "श्री भैरवनाथ मंदिर ट्रस्ट पोर्टल लोड होत आहे...",
     "dashboard.upcoming": "आगामी महोत्सव",
     "dashboard.sliderDesc": "कृपा मिळवण्यासाठी श्री भैरवनाथ मंदिरात सहकुटुंब सहपरिवार उपस्थित राहा.",
-    "dashboard.announceTitle": "महत्त्वाची मंदिर घोषणा",
+    "dashboard.announceTitle": "महत्त्वाची मंदिर ",
     "dashboard.announceDesc": "दैनिक महा अभिषेक आरती वेळा: पहाटे ५:३० (प्रातःकाळ) आणि संध्याकाळी ७:३० (संध्याकाळ). भक्त देणगी काउंटरवर पूजा पावती बुक करू शकतात.",
     "dashboard.totalReceipts": "एकूण जमा देणगी",
     "dashboard.securedDonations": "सुरक्षित देणगी जमा",
@@ -420,11 +425,20 @@ const translations: Record<"en" | "mr", Record<string, string>> = {
     "Rituals & Pooja": "पूजा आणि विधी",
     "Annadan Kharcha": "अन्नदान खर्च",
     "Annachhatra Kitchen": "अन्नदान खर्च",
-    "Cash": "रोख (Cash)",
-    "Check": "चेक (Check)",
-    "UPI": "युपीआय (UPI)",
+    "Cash": "रोख",
+    "Check": "चेक",
+    "UPI": "युपीआय",
     "Abhishek Pooja Sewa": "अभिषेक पूजा सेवा",
-    "Temple Renovation Fund": "मंदिर जीर्णोद्धार निधी"
+    "Temple Renovation Fund": "मंदिर जीर्णोद्धार निधी",
+    "admin": "प्रशासक",
+    "priest": "पुजारी",
+    "Trustee": "विश्वस्त",
+    "Super Admin": "सुपर ॲडमिन",
+    "bhargav panchal": "भार्गव पांचाळ",
+    "prashant singh": "प्रशांत सिंग",
+    "ajay": "अजय",
+    "shera": "शीरा",
+    "Basmati Rice": "बासमती तांदूळ"
   }
 };
 
@@ -461,8 +475,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isDarkMode]);
 
   const setLanguage = (lang: "en" | "mr") => {
-    localStorage.setItem("temple_trust_lang", lang);
-    setLanguageState(lang);
+    if (localStorage.getItem("temple_trust_lang") !== lang) {
+      localStorage.setItem("temple_trust_lang", lang);
+      setLanguageState(lang);
+      window.location.reload();
+    }
   };
 
   const setIsDarkMode = (dark: boolean) => {
@@ -511,9 +528,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, plainPassword: string) => {
     try {
-      const response = await api.post("/login", { username, password });
+      const encryptedPassword = await encryptPayloadPassword(plainPassword);
+      const response = await api.post("/login", { username, password: encryptedPassword });
       const { token: receivedToken, user: receivedUser } = response.data;
 
       const loginTimestamp = Date.now().toString();

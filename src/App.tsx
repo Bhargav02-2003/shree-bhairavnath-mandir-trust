@@ -9,12 +9,25 @@ import { LoginView } from "./modules/login/view/LoginView";
 import { TrusteeManagement } from "./modules/trustee/TrusteeManagement";
 import { BannerManagement } from "./modules/banner/BannerManagement";
 import { BoardMembers } from "./modules/board-members/BoardMembers";
-import { Home, IndianRupee, BookOpen, Calendar, Clock, LogIn, LogOut, User, Landmark, ShieldCheck, ShieldAlert, Image, UsersRound } from "lucide-react";
-
-type Tab = "dashboard" | "receipts" | "expenses" | "yearly_events" | "monthly_events" | "admin" | "trustees" | "banners" | "board_members";
+import { MobileDrawer, Tab } from "./components/MobileDrawer";
+import {
+  Home,
+  IndianRupee,
+  BookOpen,
+  Calendar,
+  Clock,
+  LogIn,
+  LogOut,
+  User,
+  ShieldCheck,
+  Image as ImageIcon,
+  UsersRound,
+  Menu,
+} from "lucide-react";
 
 const Layout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const { user, logout, language, setLanguage, isDarkMode, setIsDarkMode, t } = useAuth();
 
   const handleLogout = async () => {
@@ -92,16 +105,15 @@ const Layout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col antialiased">
-      
       {/* 1. Header with Mandir branding */}
       <header className="text-white shadow-md relative overflow-hidden shrink-0" style={{ backgroundColor: "#fa5c07" }}>
         <div className="absolute top-0 right-0 opacity-10 pointer-events-none transform translate-x-20 -translate-y-20 select-none text-[220px]">
           ॐ
         </div>
-        <div className="px-4 py-4 md:py-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-center md:text-left">
+        <div className="px-4 py-3 md:py-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 md:gap-4 text-left">
             {/* Mandir image - square */}
-            <div className="h-16 w-16 rounded-xl overflow-hidden border-2 border-white/40 shadow-lg shrink-0">
+            <div className="h-12 w-12 md:h-16 md:w-16 rounded-xl overflow-hidden border-2 border-white/40 shadow-lg shrink-0">
               <img
                 src="/mandir.jpg"
                 alt="Shree Bhairavnath Mandir"
@@ -109,20 +121,20 @@ const Layout: React.FC = () => {
               />
             </div>
             <div>
-              <p className="text-amber-200 font-bold tracking-widest text-[10px] md:text-xs uppercase font-display">
+              <p className="text-amber-200 font-bold tracking-widest text-[9px] md:text-xs uppercase font-display">
                 {t("brand.prassana")}
               </p>
-              <h1 className="text-xl md:text-2xl font-black font-display tracking-tight text-white mt-0.5">
+              <h1 className="text-lg md:text-2xl font-black font-display tracking-tight text-white mt-0.5 leading-tight">
                 {t("brand.title")}
               </h1>
-              <p className="text-xs text-white/70 mt-0.5">
+              <p className="text-[11px] md:text-xs text-white/70 mt-0.5 line-clamp-1 md:line-clamp-none">
                 {t("brand.subtitle")}
               </p>
             </div>
           </div>
 
-          {/* Quick info or login status */}
-          <div className="flex items-center gap-3">
+          {/* Desktop User Info & Login Button (Hidden on Mobile) */}
+          <div className="hidden md:flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-white/20" style={{ backgroundColor: "rgba(0,0,0,0.2)" }}>
                 <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
@@ -148,11 +160,20 @@ const Layout: React.FC = () => {
               </button>
             )}
           </div>
+
+          {/* Mobile Hamburger Button (Visible ONLY on Mobile md:hidden) */}
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="md:hidden p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+            aria-label="Open mobile navigation menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
         </div>
       </header>
 
-      {/* 2. White navigation menu containing bento designed tabs */}
-      <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-40 shrink-0">
+      {/* 2. Desktop Navigation Menu Bar (Hidden on Mobile) */}
+      <nav className="hidden md:block bg-white border-b border-gray-100 shadow-sm sticky top-0 z-40 shrink-0">
         <div className="mx-auto px-4 flex items-center justify-between">
           <div className="flex overflow-x-auto no-scrollbar py-1 flex-1">
             <button
@@ -224,7 +245,7 @@ const Layout: React.FC = () => {
                     : "border-transparent text-gray-500 hover:text-gray-800"
                 }`}
               >
-                <Image className="h-4 w-4" />
+                <ImageIcon className="h-4 w-4" />
                 {t("nav.dashboard") === "मुख्य डॅशबोर्ड" ? "बॅनर आणि सूचना" : "Banners & Notifications"}
               </button>
             )}
@@ -268,7 +289,7 @@ const Layout: React.FC = () => {
             </button>
           </div>
 
-          {/* Fixed Dark Mode & Language Toggles */}
+          {/* Desktop Fixed Dark Mode & Language Toggles */}
           <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
             {/* Language switches */}
             <div className="flex bg-gray-100 dark:bg-gray-800/80 rounded-lg p-0.5 border border-gray-200/50 dark:border-gray-700/50 select-none">
@@ -310,12 +331,20 @@ const Layout: React.FC = () => {
         </div>
       </nav>
 
-      {/* 3. Main Dashboard Body Container (Bento Grid Styled Content) */}
+      {/* Reusable Mobile Drawer */}
+      <MobileDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
+
+      {/* 3. Main Dashboard Body Container */}
       <main className="flex-1 w-full mx-auto p-4 md:p-6 pb-20">
         {renderContent()}
       </main>
 
-      {/* 4. Sanskrit Devotional Footer */}
+      {/* 4. Devotional Footer */}
       <footer className="text-white/70 py-6 border-t text-center text-xs shrink-0 select-none" style={{ backgroundColor: "#7a2a02", borderColor: "#5e2002" }}>
         <p className="font-display tracking-widest text-amber-300 font-bold mb-1">
           {t("brand.footer1")}
@@ -323,7 +352,6 @@ const Layout: React.FC = () => {
         <p>{t("brand.footer2")}</p>
         <p className="mt-1 text-white/30 text-[10px]">{t("brand.footer3")}</p>
       </footer>
-
     </div>
   );
 };

@@ -3,6 +3,7 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import mongoose from "mongoose";
 
 const isMysql = process.env.DB_HOST && process.env.DB_DATABASE;
 
@@ -793,6 +794,19 @@ BoardMember.init(
 
 // Seeding function
 export async function initDatabase() {
+  if (process.env.MONGODB_URI) {
+    if (process.env.MONGODB_URI.includes("<db_password>")) {
+      console.warn("MongoDB connection URI is configured, but contains '<db_password>' placeholder. Replace <db_password> with actual password in .env.");
+    } else {
+      try {
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log("Connected to MongoDB database successfully!");
+      } catch (mongoErr) {
+        console.error("MongoDB connection failed:", mongoErr);
+      }
+    }
+  }
+
   if (isMysql) {
     try {
       const connection = await mysql.createConnection({
@@ -812,11 +826,15 @@ export async function initDatabase() {
   try {
     await sequelize.sync({ alter: true });
   } catch (err) {
-    console.warn("Alter sync failed, recreating database tables (force: true):", err);
-    await sequelize.sync({ force: true });
+    try {
+      await sequelize.sync({ force: true });
+    } catch {
+      console.warn("SQLite database sync bypassed (using MongoDB layer)");
+    }
   }
 
-  const userCount = await User.count();
+  try {
+    const userCount = await User.count();
   if (userCount === 0) {
     // Hash password
     const hashedPassword = await bcrypt.hash("admin123", 10);
@@ -994,5 +1012,8 @@ export async function initDatabase() {
         user: "system",
       },
     ]);
+    }
+  } catch {
+    // Ignore SQLite legacy seed error
   }
 }
