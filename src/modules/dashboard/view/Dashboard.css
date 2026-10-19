@@ -9,3 +9,28 @@
 .dashboard-title {
   font-family: var(--font-display);
 }
+
+/* Custom smooth scrollbar for banner notices */
+.custom-banner-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #f59e0b rgba(0, 0, 0, 0.05);
+  -webkit-overflow-scrolling: touch;
+}
+
+.custom-banner-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-banner-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+}
+
+.custom-banner-scroll::-webkit-scrollbar-thumb {
+  background: #f59e0b;
+  border-radius: 6px;
+}
+
+.custom-banner-scroll::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}

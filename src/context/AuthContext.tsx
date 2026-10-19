@@ -11,7 +11,7 @@ export const api = axios.create({
 // Request interceptor to automatically attach JWT token and language header
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("temple_trust_token");
-  const lang = localStorage.getItem("temple_trust_lang") || "en";
+  const lang = localStorage.getItem("temple_trust_lang_pref") || "mr";
   if (config.headers) {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -458,28 +458,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const [language, setLanguageState] = useState<"en" | "mr">(() => {
-    return (localStorage.getItem("temple_trust_lang") as "en" | "mr") || "en";
+    const saved = localStorage.getItem("temple_trust_lang_pref");
+    if (saved === "en" || saved === "mr") {
+      return saved;
+    }
+    // Default to Marathi and override old legacy storage
+    try {
+      localStorage.setItem("temple_trust_lang_pref", "mr");
+      localStorage.setItem("temple_trust_lang", "mr");
+    } catch {}
+    return "mr";
   });
 
   const [isDarkMode, setIsDarkModeState] = useState<boolean>(() => {
     return localStorage.getItem("temple_trust_dark") === "true";
   });
 
-  // Apply dark class to html on load and changes
+  // Apply dark class and html lang attribute on load and changes
   useEffect(() => {
+    document.documentElement.lang = language;
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
     }
-  }, [isDarkMode]);
+  }, [isDarkMode, language]);
 
   const setLanguage = (lang: "en" | "mr") => {
-    if (localStorage.getItem("temple_trust_lang") !== lang) {
-      localStorage.setItem("temple_trust_lang", lang);
-      setLanguageState(lang);
-      window.location.reload();
-    }
+    localStorage.setItem("temple_trust_lang_pref", lang);
+    localStorage.setItem("temple_trust_lang", lang);
+    setLanguageState(lang);
+    window.location.reload();
   };
 
   const setIsDarkMode = (dark: boolean) => {

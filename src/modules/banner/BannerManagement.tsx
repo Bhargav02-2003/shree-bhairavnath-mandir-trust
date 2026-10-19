@@ -391,9 +391,9 @@ export const BannerManagement: React.FC = () => {
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      rows={3}
+                      rows={6}
                       placeholder={isMarathi ? "येथे मंदिराची महत्त्वाची सूचना किंवा योजनेची माहिती लिहा..." : "Write official temple announcement or scheme guidelines here..."}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-600 resize-none"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-600 resize-y"
                     />
                     {errors.description && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.description}</p>}
                   </div>

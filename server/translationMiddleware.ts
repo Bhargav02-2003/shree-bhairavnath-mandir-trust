@@ -269,8 +269,8 @@ export async function translateApiResponseObject(rawInput: any): Promise<any> {
  * when header `Accept-Language: mr` or query `lang=mr` is received.
  */
 export const responseTranslationMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const rawLangHeader = (req.headers["accept-language"] || req.query.lang || "").toString().toLowerCase();
-  const isMarathiRequested = rawLangHeader.includes("mr") || rawLangHeader.includes("marathi");
+  const rawLangHeader = (req.headers["accept-language"] || req.query.lang || "mr").toString().toLowerCase();
+  const isMarathiRequested = !rawLangHeader.includes("en") || rawLangHeader.includes("mr") || rawLangHeader.includes("marathi");
 
   if (isMarathiRequested) {
     const originalJson = res.json.bind(res);
