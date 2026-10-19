@@ -1,6 +1,6 @@
 {
   "version": 2,
- "buildCommand": "npx vite build",
+  "buildCommand": "vite build",
   "outputDirectory": "dist",
   "rewrites": [
     {
