@@ -131,13 +131,15 @@ export async function translateTextsToMarathi(texts: string[]): Promise<string[]
     return results;
   }
 
-  // 1. Try IndicTrans2 Microservice
-  try {
-    const response = await axios.post(INDICTRANS2_URL, {
-      input: missingTexts,
-      src_lang: "eng_Latn",
-      tgt_lang: "mar_Deva"
-    }, { timeout: 2000 });
+  // 1. Try IndicTrans2 Microservice (skip in serverless if pointing to localhost)
+  const isServerlessEnv = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (!isServerlessEnv || !INDICTRANS2_URL.includes("localhost")) {
+    try {
+      const response = await axios.post(INDICTRANS2_URL, {
+        input: missingTexts,
+        src_lang: "eng_Latn",
+        tgt_lang: "mar_Deva"
+      }, { timeout: 2000 });
 
     if (response.data && Array.isArray(response.data.translations) && response.data.translations.length === missingTexts.length) {
       const translatedBatch = response.data.translations;
@@ -148,8 +150,9 @@ export async function translateTextsToMarathi(texts: string[]): Promise<string[]
       });
       return results;
     }
-  } catch {
-    // IndicTrans2 microservice not running locally or timed out
+    } catch {
+      // IndicTrans2 microservice not running locally or timed out
+    }
   }
 
   // 2. Try Gemini API if key is set

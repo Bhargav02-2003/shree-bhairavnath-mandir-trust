@@ -1,872 +1,20 @@
 // server/serverless.ts
 import "dotenv/config";
 import express from "express";
-
-// server/db.ts
-import { Sequelize, DataTypes, Model } from "sequelize";
-import path from "path";
-import bcrypt from "bcryptjs";
-import "dotenv/config";
-import mysql from "mysql2/promise";
-import mongoose from "mongoose";
-var isMysql = process.env.DB_HOST && process.env.DB_DATABASE;
-var isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-var sequelize = isMysql ? new Sequelize(
-  process.env.DB_DATABASE,
-  process.env.DB_USER || process.env.DB_USERNAME || "root",
-  process.env.DB_PASSWORD || "",
-  {
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || "3306", 10),
-    dialect: "mysql",
-    logging: false
-  }
-) : new Sequelize({
-  dialect: "sqlite",
-  storage: isServerless ? path.join("/tmp", "database.sqlite") : path.join(process.cwd(), "database.sqlite"),
-  logging: false
-});
-var User = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-User.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    username: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true
-    },
-    password: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    role: {
-      type: DataTypes.ENUM("super_admin", "user"),
-      allowNull: false,
-      defaultValue: "user"
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    permissions: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: "read"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "users"
-  }
-);
-var Receipt = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-Receipt.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    receiptNo: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: false
-      // Turned off unique constraint to support append-only updates/history
-    },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    reason: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    amount: {
-      type: DataTypes.FLOAT,
-      allowNull: true
-    },
-    foodName: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    foodQty: {
-      type: DataTypes.FLOAT,
-      allowNull: true
-    },
-    image: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    createdDate: {
-      type: DataTypes.DATEONLY,
-      allowNull: false
-    },
-    createdBy: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    },
-    mobile: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: ""
-    },
-    address: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    paymentMode: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: "Cash"
-    }
-  },
-  {
-    sequelize,
-    tableName: "receipts"
-  }
-);
-var Expense = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-Expense.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    category: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    amount: {
-      type: DataTypes.FLOAT,
-      allowNull: false
-    },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    date: {
-      type: DataTypes.DATEONLY,
-      allowNull: false
-    },
-    bill: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    createdBy: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    },
-    paymentMode: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: "Cash"
-    }
-  },
-  {
-    sequelize,
-    tableName: "expenses"
-  }
-);
-var YearlyEvent = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-YearlyEvent.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    title: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: false
-    },
-    date: {
-      type: DataTypes.DATEONLY,
-      allowNull: false
-    },
-    image: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    location: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    eventStatus: {
-      type: DataTypes.ENUM("upcoming", "completed", "cancelled"),
-      allowNull: false,
-      defaultValue: "upcoming"
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "yearly_events"
-  }
-);
-var MonthlyEvent = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-MonthlyEvent.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    title: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: false
-    },
-    date: {
-      type: DataTypes.DATEONLY,
-      allowNull: false
-    },
-    image: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    location: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    eventStatus: {
-      type: DataTypes.ENUM("upcoming", "completed", "cancelled"),
-      allowNull: false,
-      defaultValue: "upcoming"
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "monthly_events"
-  }
-);
-var Banner = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-Banner.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    image: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    title: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    color: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    fontStyle: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    expiresAt: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    active: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "banners"
-  }
-);
-var SliderImage = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-SliderImage.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    image: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    title: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    active: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "slider_images"
-  }
-);
-var ActivityLog = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-ActivityLog.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    apiUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    },
-    action: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    details: {
-      type: DataTypes.TEXT,
-      allowNull: false
-    },
-    user: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    timestamp: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "activity_logs",
-    timestamps: true
-  }
-);
-var Trustee = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-Trustee.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    fullName: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    username: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true
-    },
-    passwordHash: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    mobile: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    designation: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    profilePhoto: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "trustees"
-  }
-);
-var TrusteePermission = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-TrusteePermission.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    trusteeUuid: {
-      type: DataTypes.UUID,
-      allowNull: false
-    },
-    moduleName: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    canRead: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    },
-    canWrite: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    },
-    canUpdate: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "trustee_permissions"
-  }
-);
-Trustee.hasMany(TrusteePermission, { as: "permissions", foreignKey: "trusteeUuid", onDelete: "CASCADE" });
-TrusteePermission.belongsTo(Trustee, { foreignKey: "trusteeUuid" });
-var BoardMember = class extends Model {
-  toJSON() {
-    const values = super.toJSON();
-    values.id = this.uuid;
-    return values;
-  }
-};
-BoardMember.init(
-  {
-    uuid: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    designation: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    profilePhoto: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    displayOrder: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 0
-    },
-    status: {
-      type: DataTypes.ENUM("active", "inactive"),
-      allowNull: false,
-      defaultValue: "active"
-    },
-    authorUuid: {
-      type: DataTypes.UUID,
-      allowNull: true
-    }
-  },
-  {
-    sequelize,
-    tableName: "board_members"
-  }
-);
-async function initDatabase() {
-  const mongoUri = process.env.MONGODB_URI || "mongodb+srv://shreebhairavnathmandirtalawade_db_user:U7qVMP2fol9BLuGt@cluster0.uylgr4o.mongodb.net/shreebhairavnath?retryWrites=true&w=majority&appName=Cluster0";
-  if (mongoUri) {
-    if (mongoUri.includes("<db_password>")) {
-      console.warn("MongoDB connection URI is configured, but contains '<db_password>' placeholder. Replace <db_password> with actual password in .env.");
-    } else {
-      try {
-        if (mongoose.connection.readyState === 0) {
-          await mongoose.connect(mongoUri, {
-            serverSelectionTimeoutMS: 5e3
-          });
-          console.log("Connected to MongoDB database successfully!");
-        }
-      } catch (mongoErr) {
-        console.error("MongoDB connection failed:", mongoErr);
-      }
-    }
-  }
-  if (isServerless) {
-    return;
-  }
-  if (isMysql) {
-    try {
-      const connection = await mysql.createConnection({
-        host: process.env.DB_HOST,
-        port: parseInt(process.env.DB_PORT || "3306", 10),
-        user: process.env.DB_USER || process.env.DB_USERNAME || "root",
-        password: process.env.DB_PASSWORD || ""
-      });
-      await connection.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_DATABASE}\`;`);
-      await connection.end();
-      console.log(`Database '${process.env.DB_DATABASE}' verified/created.`);
-    } catch (dbErr) {
-      console.warn("Could not pre-create database via mysql2 connection. Relying on existing database or connection params:", dbErr);
-    }
-  }
-  try {
-    await sequelize.sync({ alter: true });
-  } catch (err) {
-    try {
-      await sequelize.sync({ force: true });
-    } catch {
-      console.warn("SQLite database sync bypassed (using MongoDB layer)");
-    }
-  }
-  try {
-    const userCount = await User.count();
-    if (userCount === 0) {
-      const hashedPassword = await bcrypt.hash("admin123", 10);
-      await User.create({
-        name: "Super Admin",
-        username: "admin",
-        password: hashedPassword,
-        email: "admin@bhairavnathmandir.org",
-        role: "super_admin",
-        status: "active",
-        permissions: "read,write,update,delete"
-      });
-      const userPassword = await bcrypt.hash("user123", 10);
-      await User.create({
-        name: "Mandir Priest",
-        username: "priest",
-        password: userPassword,
-        email: "priest@bhairavnathmandir.org",
-        role: "user",
-        status: "active",
-        permissions: "read,write,update"
-      });
-      console.log("Database seeded with default users: admin (admin123), priest (user123)");
-      await SliderImage.bulkCreate([
-        {
-          image: "https://images.unsplash.com/photo-1608958416715-bc44a08cb36d?auto=format&fit=crop&q=80&w=1200",
-          title: "Maha Shivratri Sringar 2026",
-          active: true
-        },
-        {
-          image: "https://images.unsplash.com/photo-1542856391-010fb87dcfed?auto=format&fit=crop&q=80&w=1200",
-          title: "Bhairavnath Jayanti Mahotsav",
-          active: true
-        },
-        {
-          image: "https://images.unsplash.com/photo-1561361513-2d000a50f0db?auto=format&fit=crop&q=80&w=1200",
-          title: "Grand Palkhi Sohala Festival",
-          active: true
-        }
-      ]);
-      await Banner.bulkCreate([
-        {
-          image: "https://images.unsplash.com/photo-1609137144814-7f897686523c?auto=format&fit=crop&q=80&w=600",
-          title: "Daily Bhakti Aarti Schedule",
-          active: true,
-          status: "active"
-        },
-        {
-          image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=600",
-          title: "Donation For Temple Renovation Scheme",
-          active: true,
-          status: "active"
-        }
-      ]);
-      await YearlyEvent.bulkCreate([
-        {
-          title: "Shree Bhairavnath Annual Palkhi Sohala",
-          description: "The grand annual processional chariot ceremony with thousands of devotees matching holy beats of Dhol-Tasha.",
-          date: "2026-11-20",
-          image: "https://images.unsplash.com/photo-1542856391-010fb87dcfed?auto=format&fit=crop&q=80&w=600",
-          location: "Mandir Main Precincts to Village Square",
-          eventStatus: "upcoming",
-          status: "active"
-        },
-        {
-          title: "Maha Shivratri Grand Abhishek",
-          description: "Rudra-Abhishek of Shree Bhairavnath with continuous chanting of vedic hymns and distributing Mahaprasad.",
-          date: "2026-03-05",
-          image: "https://images.unsplash.com/photo-1608958416715-bc44a08cb36d?auto=format&fit=crop&q=80&w=600",
-          location: "Garbhgruha (Inner Sanctum)",
-          eventStatus: "completed",
-          status: "active"
-        }
-      ]);
-      await MonthlyEvent.bulkCreate([
-        {
-          title: "Kaalbhairav Ashtami Havan",
-          description: "Special powerful monthly havan ritual performed during Ashtami Tithi for divine protections.",
-          date: "2026-08-05",
-          image: "https://images.unsplash.com/photo-1561361513-2d000a50f0db?auto=format&fit=crop&q=80&w=600",
-          location: "Yajna Shala",
-          eventStatus: "upcoming",
-          status: "active"
-        },
-        {
-          title: "Monthly Mahaprasad Distribution",
-          description: "Free community kitchen serving hot, nutritious meals to over 5,000 pilgrims on Amavasya.",
-          date: "2026-07-28",
-          image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=600",
-          location: "Annachhatra Hall",
-          eventStatus: "upcoming",
-          status: "active"
-        }
-      ]);
-      await Receipt.bulkCreate([
-        {
-          receiptNo: "REC-1001",
-          name: "Rajesh Ramchandra Patil",
-          reason: "General Donation",
-          amount: 5001,
-          foodName: null,
-          foodQty: null,
-          image: "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300",
-          createdDate: "2026-07-15",
-          createdBy: "admin",
-          mobile: "9876543210",
-          address: "Talwade, Pune"
-        },
-        {
-          receiptNo: "REC-1002",
-          name: "Sunita Kishor Deshmukh",
-          reason: "Food",
-          amount: null,
-          foodName: "Basmati Rice",
-          foodQty: 100,
-          image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300",
-          createdDate: "2026-07-16",
-          createdBy: "priest",
-          mobile: "9876543211",
-          address: "Chinchwad, Pune"
-        },
-        {
-          receiptNo: "REC-1003",
-          name: "Abhay Dinkar Joshi",
-          reason: "Abhishek Pooja Sewa",
-          amount: 1500,
-          foodName: null,
-          foodQty: null,
-          image: "https://images.unsplash.com/photo-1542856391-010fb87dcfed?auto=format&fit=crop&q=80&w=300",
-          createdDate: "2026-07-17",
-          createdBy: "priest",
-          mobile: "9876543212",
-          address: "Hadapsar, Pune"
-        }
-      ]);
-      await Expense.bulkCreate([
-        {
-          name: "Purchase of Havan Samagri",
-          category: "Rituals & Pooja",
-          amount: 8750,
-          description: "Purchased high-grade natural herbs, camphor, ghee and dry woods for Ashtami Havan.",
-          date: "2026-07-04",
-          bill: "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300",
-          createdBy: "admin"
-        },
-        {
-          name: "Mandir Outer Painting Touchup",
-          category: "Maintenance",
-          amount: 14200,
-          description: "Payment made to painters for touchup of main entrance arches before Palkhi.",
-          date: "2026-07-10",
-          bill: "https://images.unsplash.com/photo-1561361513-2d000a50f0db?auto=format&fit=crop&q=80&w=300",
-          createdBy: "admin"
-        }
-      ]);
-      await ActivityLog.bulkCreate([
-        {
-          action: "DATABASE_INITIALIZED",
-          details: "System successfully configured and seeded with sample data.",
-          user: "system"
-        }
-      ]);
-    }
-  } catch {
-  }
-}
+import mongoose3 from "mongoose";
 
 // server/routes.ts
 import { Router } from "express";
-import mongoose3 from "mongoose";
+import mongoose2 from "mongoose";
 import jwt from "jsonwebtoken";
-import bcrypt2 from "bcryptjs";
+import bcrypt from "bcryptjs";
 import multer from "multer";
-import path2 from "path";
+import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 
 // server/mongoModels.ts
-import mongoose2, { Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 var schemaOptions = {
   timestamps: true,
   toJSON: {
@@ -1045,17 +193,17 @@ var BoardMemberSchema = new Schema(
   },
   schemaOptions
 );
-var MongoUser = mongoose2.models.User || mongoose2.model("User", UserSchema);
-var MongoReceipt = mongoose2.models.Receipt || mongoose2.model("Receipt", ReceiptSchema);
-var MongoExpense = mongoose2.models.Expense || mongoose2.model("Expense", ExpenseSchema);
-var MongoYearlyEvent = mongoose2.models.YearlyEvent || mongoose2.model("YearlyEvent", YearlyEventSchema);
-var MongoMonthlyEvent = mongoose2.models.MonthlyEvent || mongoose2.model("MonthlyEvent", MonthlyEventSchema);
-var MongoBanner = mongoose2.models.Banner || mongoose2.model("Banner", BannerSchema);
-var MongoSliderImage = mongoose2.models.SliderImage || mongoose2.model("SliderImage", SliderImageSchema);
-var MongoActivityLog = mongoose2.models.ActivityLog || mongoose2.model("ActivityLog", ActivityLogSchema);
-var MongoTrustee = mongoose2.models.Trustee || mongoose2.model("Trustee", TrusteeSchema);
-var MongoTrusteePermission = mongoose2.models.TrusteePermission || mongoose2.model("TrusteePermission", TrusteePermissionSchema);
-var MongoBoardMember = mongoose2.models.BoardMember || mongoose2.model("BoardMember", BoardMemberSchema);
+var MongoUser = mongoose.models.User || mongoose.model("User", UserSchema);
+var MongoReceipt = mongoose.models.Receipt || mongoose.model("Receipt", ReceiptSchema);
+var MongoExpense = mongoose.models.Expense || mongoose.model("Expense", ExpenseSchema);
+var MongoYearlyEvent = mongoose.models.YearlyEvent || mongoose.model("YearlyEvent", YearlyEventSchema);
+var MongoMonthlyEvent = mongoose.models.MonthlyEvent || mongoose.model("MonthlyEvent", MonthlyEventSchema);
+var MongoBanner = mongoose.models.Banner || mongoose.model("Banner", BannerSchema);
+var MongoSliderImage = mongoose.models.SliderImage || mongoose.model("SliderImage", SliderImageSchema);
+var MongoActivityLog = mongoose.models.ActivityLog || mongoose.model("ActivityLog", ActivityLogSchema);
+var MongoTrustee = mongoose.models.Trustee || mongoose.model("Trustee", TrusteeSchema);
+var MongoTrusteePermission = mongoose.models.TrusteePermission || mongoose.model("TrusteePermission", TrusteePermissionSchema);
+var MongoBoardMember = mongoose.models.BoardMember || mongoose.model("BoardMember", BoardMemberSchema);
 
 // server/translationMiddleware.ts
 import axios from "axios";
@@ -1168,22 +316,25 @@ async function translateTextsToMarathi(texts) {
   if (missingTexts.length === 0) {
     return results;
   }
-  try {
-    const response = await axios.post(INDICTRANS2_URL, {
-      input: missingTexts,
-      src_lang: "eng_Latn",
-      tgt_lang: "mar_Deva"
-    }, { timeout: 2e3 });
-    if (response.data && Array.isArray(response.data.translations) && response.data.translations.length === missingTexts.length) {
-      const translatedBatch = response.data.translations;
-      missingIndices.forEach((origIdx, i) => {
-        const tr = translatedBatch[i];
-        results[origIdx] = tr;
-        translationCache.set(missingTexts[i].toLowerCase(), tr);
-      });
-      return results;
+  const isServerlessEnv = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (!isServerlessEnv || !INDICTRANS2_URL.includes("localhost")) {
+    try {
+      const response = await axios.post(INDICTRANS2_URL, {
+        input: missingTexts,
+        src_lang: "eng_Latn",
+        tgt_lang: "mar_Deva"
+      }, { timeout: 2e3 });
+      if (response.data && Array.isArray(response.data.translations) && response.data.translations.length === missingTexts.length) {
+        const translatedBatch = response.data.translations;
+        missingIndices.forEach((origIdx, i) => {
+          const tr = translatedBatch[i];
+          results[origIdx] = tr;
+          translationCache.set(missingTexts[i].toLowerCase(), tr);
+        });
+        return results;
+      }
+    } catch {
     }
-  } catch {
   }
   if (aiClient) {
     try {
@@ -1315,8 +466,8 @@ apiRouter.use((req, res, next) => {
   next();
 });
 var JWT_SECRET = process.env.JWT_SECRET || "shree_bhairavnath_secret_key";
-var isServerless2 = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-var uploadsDir = isServerless2 ? path2.join("/tmp", "uploads") : path2.join(process.cwd(), "uploads");
+var isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+var uploadsDir = isServerless ? path.join("/tmp", "uploads") : path.join(process.cwd(), "uploads");
 try {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -1330,7 +481,7 @@ var storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path2.extname(file.originalname));
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
 var upload = multer({
@@ -1339,7 +490,7 @@ var upload = multer({
   // 5MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|pdf/;
-    const extname = allowedTypes.test(path2.extname(file.originalname).toLowerCase());
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
     if (extname && mimetype) {
       return cb(null, true);
@@ -1483,7 +634,7 @@ apiRouter.post("/login", async (req, res) => {
     if (!user) {
       const trustee = await MongoTrustee.findOne({ username, status: "active" });
       if (trustee) {
-        const isMatch2 = await bcrypt2.compare(password, trustee.passwordHash);
+        const isMatch2 = await bcrypt.compare(password, trustee.passwordHash);
         if (!isMatch2) {
           return res.status(401).json({ message: "Invalid password" });
         }
@@ -1531,7 +682,7 @@ apiRouter.post("/login", async (req, res) => {
       }
       return res.status(401).json({ message: "Invalid username or inactive account" });
     }
-    const isMatch = await bcrypt2.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid password" });
     }
@@ -1586,7 +737,7 @@ apiRouter.post("/users", authenticate, authorize("", true), async (req, res) => 
     if (existing) {
       return res.status(400).json({ message: "Username already exists" });
     }
-    const hashedPassword = await bcrypt2.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const defaultPerms = role === "super_admin" ? "read,write,update,delete" : permissions || "read,write,update";
     const newUser = await MongoUser.create({
       uuid: crypto.randomUUID(),
@@ -1620,7 +771,7 @@ apiRouter.put("/users/:id", authenticate, authorize("", true), async (req, res) 
     if (status) user.status = status;
     if (permissions) user.permissions = permissions;
     if (password) {
-      user.password = await bcrypt2.hash(password, 10);
+      user.password = await bcrypt.hash(password, 10);
     }
     user.authorUuid = req.user.uuid || null;
     await user.save();
@@ -2164,7 +1315,7 @@ apiRouter.post("/trustees", authenticate, blockTrustees, async (req, res) => {
     if (existing) {
       return res.status(400).json({ message: "Username already exists" });
     }
-    const passwordHash = await bcrypt2.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
     const trusteeUuid = crypto.randomUUID();
     const trustee = await MongoTrustee.create({
       uuid: trusteeUuid,
@@ -2272,7 +1423,7 @@ apiRouter.patch("/trustees/:id/reset-password", authenticate, blockTrustees, asy
     if (!trustee || trustee.status === "inactive") {
       return res.status(404).json({ message: "Trustee not found" });
     }
-    trustee.passwordHash = await bcrypt2.hash(password, 10);
+    trustee.passwordHash = await bcrypt.hash(password, 10);
     trustee.authorUuid = req.user.uuid || null;
     await trustee.save();
     await logActivity("TRUSTEE_PASSWORD_RESET", `Reset password for trustee ${trustee.fullName}`, req.user.username);
@@ -2335,7 +1486,7 @@ var putBoardMembersHandler = async (req, res) => {
     const query = {
       $or: [
         { uuid: req.params.id },
-        ...mongoose3.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []
+        ...mongoose2.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []
       ]
     };
     const member = await MongoBoardMember.findOne(query);
@@ -2361,7 +1512,7 @@ var deleteBoardMembersHandler = async (req, res) => {
     const query = {
       $or: [
         { uuid: req.params.id },
-        ...mongoose3.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []
+        ...mongoose2.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []
       ]
     };
     const member = await MongoBoardMember.findOne(query);
@@ -2372,7 +1523,7 @@ var deleteBoardMembersHandler = async (req, res) => {
     const memberPhoto = member.profilePhoto;
     await MongoBoardMember.deleteOne({ _id: member._id });
     if (memberPhoto && memberPhoto.startsWith("/uploads/")) {
-      const filePath = path2.join(process.cwd(), memberPhoto);
+      const filePath = path.join(process.cwd(), memberPhoto);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
@@ -2393,13 +1544,33 @@ apiRouter.delete("/board-members/:id", authenticate, authorize("delete"), delete
 var app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(async (req, res, next) => {
+var mongoUri = process.env.MONGODB_URI || "mongodb+srv://shreebhairavnathmandirtalawade_db_user:U7qVMP2fol9BLuGt@cluster0.uylgr4o.mongodb.net/shreebhairavnath?retryWrites=true&w=majority&appName=Cluster0";
+var isConnecting = false;
+async function ensureDbConnected() {
+  if (mongoose3.connection.readyState === 1) return;
+  if (isConnecting) return;
+  isConnecting = true;
   try {
-    await initDatabase();
+    await mongoose3.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5e3
+    });
+    console.log("Connected to MongoDB successfully!");
   } catch (err) {
-    console.error("Database initialization failed in serverless function:", err);
+    console.error("MongoDB connection error in serverless:", err);
+  } finally {
+    isConnecting = false;
   }
+}
+app.use(async (req, res, next) => {
+  await ensureDbConnected();
   next();
+});
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    mongoState: mongoose3.connection.readyState,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  });
 });
 app.use("/api", apiRouter);
 app.use(apiRouter);
