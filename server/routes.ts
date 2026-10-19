@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import multer from "multer";
@@ -1215,16 +1216,18 @@ apiRouter.delete("/trustees/:id", authenticate, blockTrustees, async (req: any, 
 });
 
 // --- Board Members (Public Read, Admin Write) ---
-apiRouter.get("/board_members", async (req: Request, res: Response) => {
+const getBoardMembersHandler = async (req: Request, res: Response) => {
   try {
     const members = await MongoBoardMember.find({ status: "active" }).sort({ displayOrder: 1, createdAt: 1 });
     res.json(members);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
-});
+};
+apiRouter.get("/board_members", getBoardMembersHandler);
+apiRouter.get("/board-members", getBoardMembersHandler);
 
-apiRouter.post("/board_members", authenticate, authorize("write"), async (req: any, res: Response) => {
+const postBoardMembersHandler = async (req: any, res: Response) => {
   const { name, designation, profilePhoto, displayOrder } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ message: "Member name is required" });
@@ -1244,12 +1247,20 @@ apiRouter.post("/board_members", authenticate, authorize("write"), async (req: a
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
-});
+};
+apiRouter.post("/board_members", authenticate, authorize("write"), postBoardMembersHandler);
+apiRouter.post("/board-members", authenticate, authorize("write"), postBoardMembersHandler);
 
-apiRouter.put("/board_members/:id", authenticate, authorize("update"), async (req: any, res: Response) => {
+const putBoardMembersHandler = async (req: any, res: Response) => {
   const { name, designation, profilePhoto, displayOrder } = req.body;
   try {
-    const member = await MongoBoardMember.findOne({ uuid: req.params.id });
+    const query = {
+      $or: [
+        { uuid: req.params.id },
+        ...(mongoose.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []),
+      ],
+    };
+    const member = await MongoBoardMember.findOne(query);
     if (!member || member.status === "inactive") {
       return res.status(404).json({ message: "Board member not found" });
     }
@@ -1264,20 +1275,45 @@ apiRouter.put("/board_members/:id", authenticate, authorize("update"), async (re
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
-});
+};
+apiRouter.put("/board_members/:id", authenticate, authorize("update"), putBoardMembersHandler);
+apiRouter.put("/board-members/:id", authenticate, authorize("update"), putBoardMembersHandler);
 
-apiRouter.delete("/board_members/:id", authenticate, authorize("delete"), async (req: any, res: Response) => {
+const deleteBoardMembersHandler = async (req: any, res: Response) => {
   try {
-    const member = await MongoBoardMember.findOne({ uuid: req.params.id });
+    const query = {
+      $or: [
+        { uuid: req.params.id },
+        ...(mongoose.isValidObjectId(req.params.id) ? [{ _id: req.params.id }] : []),
+      ],
+    };
+    const member = await MongoBoardMember.findOne(query);
     if (!member) {
       return res.status(404).json({ message: "Board member not found" });
     }
-    member.status = "inactive";
-    member.authorUuid = req.user.uuid || null;
-    await member.save();
-    await logActivity("BOARD_MEMBER_DELETED", `Removed board member: ${member.name}`, req.user.username);
+    const memberName = member.name;
+    const memberPhoto = member.profilePhoto;
+
+    // Permanently delete from MongoDB collection
+    await MongoBoardMember.deleteOne({ _id: member._id });
+
+    // Clean up local profile photo file if present
+    if (memberPhoto && memberPhoto.startsWith("/uploads/")) {
+      const filePath = path.join(process.cwd(), memberPhoto);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch {
+          // ignore unlink error
+        }
+      }
+    }
+
+    await logActivity("BOARD_MEMBER_DELETED", `Permanently removed board member: ${memberName}`, req.user?.username || "admin");
     res.json({ message: "Board member removed successfully" });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
-});
+};
+apiRouter.delete("/board_members/:id", authenticate, authorize("delete"), deleteBoardMembersHandler);
+apiRouter.delete("/board-members/:id", authenticate, authorize("delete"), deleteBoardMembersHandler);
