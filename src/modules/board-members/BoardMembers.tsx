@@ -111,6 +111,7 @@ export const BoardMembers: React.FC = () => {
     try {
       await api.delete(`/board_members/${id}`);
       setDeleteConfirm(null);
+      setMembers((prev) => prev.filter((m) => m.id !== id && (m as any).uuid !== id));
       fetchMembers();
     } catch (err: any) {
       setError(err.response?.data?.message || (isMarathi ? "हटवण्यात अयशस्वी." : "Failed to delete member."));
@@ -213,7 +214,7 @@ export const BoardMembers: React.FC = () => {
                   </button>
                   {canDelete && (
                     <button
-                      onClick={() => setDeleteConfirm(member.id)}
+                      onClick={() => setDeleteConfirm(member.id || (member as any).uuid)}
                       className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-lg transition cursor-pointer border border-red-100"
                       title={isMarathi ? "हटवा" : "Delete"}
                     >
