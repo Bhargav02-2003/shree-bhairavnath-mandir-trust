@@ -66,7 +66,7 @@ const Layout: React.FC = () => {
             <div>
               <h3 className="text-xl font-bold font-display text-gray-900">Secure Admin Session</h3>
               <p className="text-xs text-gray-500 mt-1">
-                You are currently logged in as a recognized official of Shree Bhairavnath Mandir Trust.
+                You are currently logged in as a recognized official of Shree Bhairavnath Mandir Talawade.
               </p>
             </div>
 
@@ -112,12 +112,15 @@ const Layout: React.FC = () => {
         </div>
         <div className="px-4 py-3 md:py-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 md:gap-4 text-left">
-            {/* Mandir image - square */}
-            <div className="h-12 w-12 md:h-16 md:w-16 rounded-xl overflow-hidden border-2 border-white/40 shadow-lg shrink-0">
+            {/* Mandir image - square with 2px golden border */}
+            <div 
+              className="h-12 w-12 md:h-16 md:w-16 rounded-xl overflow-hidden shadow-lg shrink-0"
+              style={{ border: "2px solid #d4af37" }}
+            >
               <img
                 src="/mandir.jpg"
-                alt="Shree Bhairavnath Mandir"
-                className="h-full w-full object-cover object-top"
+                alt="Shree Bhairavnath Mandir Talawade"
+                className="h-full w-full object-cover object-center"
               />
             </div>
             <div>

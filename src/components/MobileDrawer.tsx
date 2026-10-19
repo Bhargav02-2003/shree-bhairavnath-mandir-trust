@@ -139,11 +139,14 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-3 relative z-10">
-            <div className="h-12 w-12 rounded-xl overflow-hidden border-2 border-white/40 shadow shrink-0">
+            <div 
+              className="h-12 w-12 rounded-xl overflow-hidden shadow shrink-0"
+              style={{ border: "2px solid #d4af37" }}
+            >
               <img
                 src="/mandir.jpg"
-                alt="Shree Bhairavnath Mandir"
-                className="h-full w-full object-cover object-top"
+                alt="Shree Bhairavnath Mandir Talawade"
+                className="h-full w-full object-cover object-center"
               />
             </div>
             <div>

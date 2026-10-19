@@ -46,7 +46,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess, onBackToPublic 
             Mandir Admin Login
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Shree Bhairavnath Mandir Trust
+            Shree Bhairavnath Mandir Talawade
           </p>
         </div>
 

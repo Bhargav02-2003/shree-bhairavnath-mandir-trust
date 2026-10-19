@@ -59,9 +59,14 @@ apiRouter.use((req: any, res: Response, next: () => void) => {
 const JWT_SECRET = process.env.JWT_SECRET || "shree_bhairavnath_secret_key";
 
 // --- Multer File Upload Setup ---
-const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const uploadsDir = isServerless ? path.join("/tmp", "uploads") : path.join(process.cwd(), "uploads");
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn("Upload directory check skipped:", e);
 }
 
 const storage = multer.diskStorage({

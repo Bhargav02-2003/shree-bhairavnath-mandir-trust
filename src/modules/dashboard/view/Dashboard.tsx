@@ -125,10 +125,10 @@ export const Dashboard: React.FC = () => {
     return [
       {
         id: "welcome-fallback",
-        title: isMarathi ? "श्री भैरवनाथ मंदिर ट्रस्ट" : "Shree Bhairavnath Mandir Trust",
+        title: isMarathi ? "श्री भैरवनाथ मंदिर, तळवडे" : "Shree Bhairavnath Mandir Talawade",
         description: isMarathi 
-          ? "भव्य स्वागत! श्री भैरवनाथ मंदिर ट्रस्ट, तळवडे, पुणे मध्ये आपले सहर्ष स्वागत." 
-          : "Welcome! Shree Bhairavnath Mandir Trust, Talwade, Pune welcomes all devotees.",
+          ? "भव्य स्वागत! श्री भैरवनाथ मंदिर, तळवडे, पुणे मध्ये आपले सहर्ष स्वागत." 
+          : "Welcome! Shree Bhairavnath Mandir Talawade, Pune welcomes all devotees.",
         color: "#991b1b",
         fontStyle: "bold",
         isBanner: true,

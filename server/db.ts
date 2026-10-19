@@ -7,6 +7,8 @@ import mongoose from "mongoose";
 
 const isMysql = process.env.DB_HOST && process.env.DB_DATABASE;
 
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
 export const sequelize = isMysql
   ? new Sequelize(
       process.env.DB_DATABASE!,
@@ -21,7 +23,9 @@ export const sequelize = isMysql
     )
   : new Sequelize({
       dialect: "sqlite",
-      storage: path.join(process.cwd(), "database.sqlite"),
+      storage: isServerless
+        ? path.join("/tmp", "database.sqlite")
+        : path.join(process.cwd(), "database.sqlite"),
       logging: false,
     });
 

@@ -257,7 +257,7 @@ export const ViewReceipt: React.FC<ViewReceiptProps> = ({
                   {t("brand.title")} (Reg. No. E-14023)
                 </h2>
                 <h3 className="text-sm font-black text-gray-800 dark:text-gray-200 uppercase tracking-wide">
-                  Shree Bhairavnath Mandir Trust
+                  Shree Bhairavnath Mandir Talawade
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 font-medium font-mono">
                   {isMarathi ? "तळवडे, ता. हवेली, जि. पुणे" : "Talwade, Tal. Haveli, Dist. Pune"}

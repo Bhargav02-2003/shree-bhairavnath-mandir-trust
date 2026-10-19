@@ -127,7 +127,7 @@ export const BoardMembers: React.FC = () => {
             {isMarathi ? "विश्वस्त मंडळ" : "Board of Members"}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            {isMarathi ? "श्री भैरवनाथ मंदिर ट्रस्टचे विश्वस्त सदस्य" : "Trustees & members of Shree Bhairavnath Mandir Trust"}
+            {isMarathi ? "श्री भैरवनाथ मंदिर, तळवडेचे विश्वस्त सदस्य" : "Trustees & members of Shree Bhairavnath Mandir Talawade"}
           </p>
         </div>
         {canWrite && (
