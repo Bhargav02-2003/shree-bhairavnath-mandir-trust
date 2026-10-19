@@ -1,23 +1,19 @@
 import "dotenv/config";
 import express from "express";
-import { initDatabase } from "../server/db";
-import { apiRouter } from "../server/routes";
+import { initDatabase } from "./db";
+import { apiRouter } from "./routes";
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-let isDbInitialized = false;
-
+// Ensure database connection before handling requests
 app.use(async (req, res, next) => {
-  if (!isDbInitialized) {
-    try {
-      await initDatabase();
-      isDbInitialized = true;
-    } catch (err) {
-      console.error("Database initialization failed in serverless function:", err);
-    }
+  try {
+    await initDatabase();
+  } catch (err) {
+    console.error("Database initialization failed in serverless function:", err);
   }
   next();
 });

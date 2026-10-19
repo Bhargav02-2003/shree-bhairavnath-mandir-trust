@@ -798,17 +798,31 @@ BoardMember.init(
 
 // Seeding function
 export async function initDatabase() {
-  if (process.env.MONGODB_URI) {
-    if (process.env.MONGODB_URI.includes("<db_password>")) {
+  const mongoUri =
+    process.env.MONGODB_URI ||
+    "mongodb+srv://shreebhairavnathmandirtalawade_db_user:U7qVMP2fol9BLuGt@cluster0.uylgr4o.mongodb.net/shreebhairavnath?retryWrites=true&w=majority&appName=Cluster0";
+
+  if (mongoUri) {
+    if (mongoUri.includes("<db_password>")) {
       console.warn("MongoDB connection URI is configured, but contains '<db_password>' placeholder. Replace <db_password> with actual password in .env.");
     } else {
       try {
-        await mongoose.connect(process.env.MONGODB_URI);
-        console.log("Connected to MongoDB database successfully!");
+        if (mongoose.connection.readyState === 0) {
+          await mongoose.connect(mongoUri, {
+            serverSelectionTimeoutMS: 5000,
+          });
+          console.log("Connected to MongoDB database successfully!");
+        }
       } catch (mongoErr) {
         console.error("MongoDB connection failed:", mongoErr);
       }
     }
+  }
+
+  // On Vercel / serverless environment, stop here.
+  // SQLite and MySQL sync should never run in serverless functions.
+  if (isServerless) {
+    return;
   }
 
   if (isMysql) {
