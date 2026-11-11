@@ -218,6 +218,10 @@ export const Dashboard: React.FC = () => {
                   alt={currentSlide.title}
                   className="w-full h-full object-cover transition-all duration-700 ease-in-out transform scale-100 hover:scale-105"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    // Fallback to default temple image if banner file is unreachable
+                    (e.currentTarget as HTMLImageElement).src = "/mandir.jpg";
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent flex flex-col justify-end p-5 md:p-8">
                   <span className="bg-amber-500 text-black text-[10px] md:text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full w-max mb-2 shadow-xs">

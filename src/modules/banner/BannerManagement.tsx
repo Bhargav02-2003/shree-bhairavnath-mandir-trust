@@ -77,8 +77,8 @@ export const BannerManagement: React.FC = () => {
     if (bannerType === "image" && !image) {
       tempErrors.image = isMarathi ? "बॅनर चित्र आवश्यक आहे" : "Banner image is required";
     }
-    if (bannerType === "text" && !description.trim()) {
-      tempErrors.description = isMarathi ? "तपशील/वर्णन आवश्यक आहे" : "Description is required";
+    if (bannerType === "text" && !description.trim() && !image) {
+      tempErrors.description = isMarathi ? "तपशील/वर्णन किंवा चित्र आवश्यक आहे" : "Description or image is required";
     }
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
@@ -100,10 +100,10 @@ export const BannerManagement: React.FC = () => {
 
     const payload = {
       title: title.trim(),
-      image: bannerType === "image" ? image : null,
-      description: bannerType === "text" ? description.trim() : null,
-      color: bannerType === "text" ? textColor : null,
-      fontStyle: bannerType === "text" ? fontStyle : null,
+      image: image || null,
+      description: description.trim() || null,
+      color: textColor || null,
+      fontStyle: fontStyle || null,
       expiresAt: expiresAt ? expiresAt : null,
       active,
     };
@@ -210,12 +210,23 @@ export const BannerManagement: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           {ban.image ? (
-                            <img
-                              src={ban.image}
-                              alt={ban.title}
-                              className="h-10 w-20 object-cover rounded-md border border-gray-200 dark:border-gray-700 shadow-2xs"
-                              referrerPolicy="no-referrer"
-                            />
+                            <div className="relative inline-block">
+                              <img
+                                src={ban.image}
+                                alt={ban.title}
+                                className="h-10 w-20 object-cover rounded-md border border-gray-200 dark:border-gray-700 shadow-2xs cursor-pointer hover:opacity-90 transition"
+                                referrerPolicy="no-referrer"
+                                onClick={() => window.open(ban.image || "", "_blank")}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                  const fallback = e.currentTarget.parentElement?.querySelector(".banner-img-fallback");
+                                  if (fallback) (fallback as HTMLElement).classList.remove("hidden");
+                                }}
+                              />
+                              <div className="banner-img-fallback hidden h-10 w-20 items-center justify-center rounded-md border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-[10px] text-gray-400 font-bold text-center px-1">
+                                {isMarathi ? "चित्र नाही" : "No Image"}
+                              </div>
+                            </div>
                           ) : (
                             <div 
                               className="h-10 w-20 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-[8px] font-bold overflow-hidden line-clamp-2 leading-tight bg-gray-50 dark:bg-gray-800"
@@ -368,21 +379,48 @@ export const BannerManagement: React.FC = () => {
               {/* Conditional Inputs */}
               {bannerType === "image" ? (
                 /* IMAGE UPLOAD */
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    {isMarathi ? "बॅनर प्रतिमा / पोस्टर अपलोड करा *" : "Upload Banner Image/Poster *"}
-                  </label>
-                  <ImageUpload
-                    onUploadSuccess={(url) => setImage(url)}
-                    defaultUrl={image}
-                    label=""
-                    placeholder={isMarathi ? "चित्र बॅनर निवडा किंवा येथे ड्रॅग करा" : "Drag and drop banner file, or click to browse"}
-                  />
-                  {errors.image && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.image}</p>}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      {isMarathi ? "बॅनर प्रतिमा / पोस्टर अपलोड करा *" : "Upload Banner Image/Poster *"}
+                    </label>
+                    <ImageUpload
+                      onUploadSuccess={(url) => setImage(url)}
+                      defaultUrl={image}
+                      label=""
+                      placeholder={isMarathi ? "चित्र बॅनर निवडा किंवा येथे ड्रॅग करा" : "Drag and drop banner file, or click to browse"}
+                    />
+                    {errors.image && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.image}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      {isMarathi ? "बॅनर तपशील / वर्णन (ऐच्छिक)" : "Banner Description / Details (Optional)"}
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      placeholder={isMarathi ? "बॅनरचा थोडक्यात तपशील लिहा..." : "Write optional banner description or scheme guidelines..."}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-600 resize-y"
+                    />
+                  </div>
                 </div>
               ) : (
                 /* TEXT NOTIFICATION OPTIONS */
                 <div className="space-y-4 p-4 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-800/20">
+                  {/* Optional notification image */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      {isMarathi ? "घोषणा / परिपत्रक प्रतिमा (ऐच्छिक)" : "Notification Image / Circular Photo (Optional)"}
+                    </label>
+                    <ImageUpload
+                      onUploadSuccess={(url) => setImage(url)}
+                      defaultUrl={image}
+                      label=""
+                      placeholder={isMarathi ? "सूचना प्रतिमा निवडा किंवा येथे ड्रॅग करा" : "Upload notification photo or circular (optional)"}
+                    />
+                  </div>
+
                   {/* Description text */}
                   <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">

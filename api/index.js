@@ -584,9 +584,60 @@ async function logActivity(action, details, user, authorUuid) {
   } catch {
   }
 }
-apiRouter.post("/upload", upload.single("file"), (req, res) => {
+async function handleServeUpload(req, res) {
+  const { filename } = req.params;
+  if (!filename) {
+    return res.status(400).send("Filename is required");
+  }
+  const localPath = path.join(process.cwd(), "uploads", filename);
+  if (fs.existsSync(localPath)) {
+    return res.sendFile(localPath);
+  }
+  const tmpPath = path.join("/tmp", "uploads", filename);
+  if (fs.existsSync(tmpPath)) {
+    return res.sendFile(tmpPath);
+  }
+  try {
+    if (mongoose2.connection.readyState === 1 && mongoose2.connection.db) {
+      const bucket = new mongoose2.mongo.GridFSBucket(mongoose2.connection.db, { bucketName: "uploads" });
+      const files = await bucket.find({ filename }).toArray();
+      if (files.length > 0) {
+        const file = files[0];
+        const contentType = file.metadata?.contentType || file.contentType || "image/jpeg";
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        const downloadStream = bucket.openDownloadStreamByName(filename);
+        return downloadStream.pipe(res);
+      }
+    }
+  } catch (err) {
+    console.error("Error serving file from GridFS:", err);
+  }
+  return res.status(404).send("File not found");
+}
+apiRouter.get("/uploads/:filename", handleServeUpload);
+apiRouter.post("/upload", upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "No file was uploaded" });
+  }
+  try {
+    if (mongoose2.connection.readyState === 1 && mongoose2.connection.db) {
+      const bucket = new mongoose2.mongo.GridFSBucket(mongoose2.connection.db, { bucketName: "uploads" });
+      const buffer = fs.readFileSync(req.file.path);
+      await new Promise((resolve, reject) => {
+        const stream = bucket.openUploadStream(req.file.filename, {
+          metadata: {
+            originalName: req.file.originalname,
+            contentType: req.file.mimetype
+          }
+        });
+        stream.on("finish", resolve);
+        stream.on("error", reject);
+        stream.end(buffer);
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to backup upload to GridFS:", err);
   }
   const fileUrl = `/uploads/${req.file.filename}`;
   res.json({ url: fileUrl, filename: req.file.filename });
@@ -789,7 +840,7 @@ apiRouter.delete("/users/:id", authenticate, authorize("", true), async (req, re
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (user.username === "admin") {
+    if (user.role === "super_admin" || user.username === "admin" || user.username === "Mh14kz7374") {
       return res.status(400).json({ message: "Cannot deactivate the default Super Admin account" });
     }
     user.status = "inactive";
@@ -1572,6 +1623,8 @@ app.get("/api/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
+app.get("/uploads/:filename", handleServeUpload);
+app.get("/api/uploads/:filename", handleServeUpload);
 app.use("/api", apiRouter);
 app.use(apiRouter);
 var serverless_default = app;

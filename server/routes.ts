@@ -191,10 +191,73 @@ async function logActivity(action: string, details: string, user: string, author
 }
 
 // --- Upload Route ---
-apiRouter.post("/upload", upload.single("file"), (req: any, res: Response) => {
+export async function handleServeUpload(req: Request, res: Response) {
+  const { filename } = req.params;
+  if (!filename) {
+    return res.status(400).send("Filename is required");
+  }
+
+  // 1. Check local uploads directory first
+  const localPath = path.join(process.cwd(), "uploads", filename);
+  if (fs.existsSync(localPath)) {
+    return res.sendFile(localPath);
+  }
+
+  // 2. Check /tmp if running in serverless
+  const tmpPath = path.join("/tmp", "uploads", filename);
+  if (fs.existsSync(tmpPath)) {
+    return res.sendFile(tmpPath);
+  }
+
+  // 3. Fallback to MongoDB GridFS (persistent cloud storage across environments)
+  try {
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: "uploads" });
+      const files = await bucket.find({ filename }).toArray();
+      if (files.length > 0) {
+        const file = files[0];
+        const contentType = (file as any).metadata?.contentType || (file as any).contentType || "image/jpeg";
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        const downloadStream = bucket.openDownloadStreamByName(filename);
+        return downloadStream.pipe(res);
+      }
+    }
+  } catch (err) {
+    console.error("Error serving file from GridFS:", err);
+  }
+
+  return res.status(404).send("File not found");
+}
+
+apiRouter.get("/uploads/:filename", handleServeUpload);
+
+apiRouter.post("/upload", upload.single("file"), async (req: any, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ message: "No file was uploaded" });
   }
+
+  // Persist uploaded file to MongoDB GridFS so it persists in serverless & across all devices
+  try {
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: "uploads" });
+      const buffer = fs.readFileSync(req.file.path);
+      await new Promise((resolve, reject) => {
+        const stream = bucket.openUploadStream(req.file.filename, {
+          metadata: {
+            originalName: req.file.originalname,
+            contentType: req.file.mimetype,
+          },
+        } as any);
+        stream.on("finish", resolve);
+        stream.on("error", reject);
+        stream.end(buffer);
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to backup upload to GridFS:", err);
+  }
+
   const fileUrl = `/uploads/${req.file.filename}`;
   res.json({ url: fileUrl, filename: req.file.filename });
 });
@@ -436,7 +499,7 @@ apiRouter.delete("/users/:id", authenticate, authorize("", true), async (req: an
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (user.username === "admin") {
+    if (user.role === "super_admin" || user.username === "admin" || user.username === "Mh14kz7374") {
       return res.status(400).json({ message: "Cannot deactivate the default Super Admin account" });
     }
 

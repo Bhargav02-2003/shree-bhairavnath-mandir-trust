@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
-import { apiRouter } from "./routes";
+import { apiRouter, handleServeUpload } from "./routes";
 
 const app = express();
 
@@ -44,6 +44,10 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Serve uploaded files directly from MongoDB GridFS / disk
+app.get("/uploads/:filename", handleServeUpload);
+app.get("/api/uploads/:filename", handleServeUpload);
 
 // Handle requests with or without /api prefix
 app.use("/api", apiRouter);

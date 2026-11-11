@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { initDatabase } from "./server/db";
-import { apiRouter } from "./server/routes";
+import { apiRouter, handleServeUpload } from "./server/routes";
 
 async function startServer() {
   const app = express();
@@ -21,9 +21,10 @@ async function startServer() {
     console.error("Database initialization failed:", err);
   }
 
-  // Serve uploads directory
+  // Serve uploads directory (disk + GridFS fallback)
   const uploadsPath = path.join(process.cwd(), "uploads");
   app.use("/uploads", express.static(uploadsPath));
+  app.get("/uploads/:filename", handleServeUpload);
 
   // Mount API Router
   app.use("/api", apiRouter);
